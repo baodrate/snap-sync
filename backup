@@ -1,0 +1,80 @@
+#!/bin/bash
+# James W. Barnett
+
+declare -r mybackupdir="/run/media/wes/backup/acer-c720"
+
+#--------------------------------------------------------
+# Don't modify anything below here
+
+set -e
+
+if [[ $EUID -ne 0 ]]; then
+    echo "Script must be run as root." 
+    exit
+fi
+
+declare -r description="latest incremental backup"
+
+# It's important not to change this userdata in the snapshots.
+declare -r userdata="extbackup=yes"
+declare -r configs="$(find /etc/snapper/configs/* -printf '%f\t\0')"
+
+for x in $configs; do
+
+    source /etc/snapper/configs/$x
+
+    do_backup=${EXT_BACKUP:-"yes"}
+
+    if [[ $do_backup == "yes" ]]; then
+
+        BACKUPDIR=${EXT_BACKUP_LOCATION:-"$mybackupdir"}
+
+        if [[ -z $BACKUPDIR ]]; then
+            echo "ERROR: External backup location not set!"
+            exit 1
+        fi
+
+        old_number=$(snapper -c $x list -t single | awk '/'"$userdata"'/ {print $1}')
+        new_number="$(snapper -c $x create --print-number)"
+        sync
+        
+        new_snapshot=$SUBVOLUME/.snapshots/$new_number/snapshot
+        new_info=$SUBVOLUME/.snapshots/$new_number/info.xml
+        backup_location=$BACKUPDIR/$x/$new_number/
+        old_backup=$BACKUPDIR/$x/$old_number/snapshot
+
+        mkdir -p $backup_location
+
+        if [[ -z "$old_number" ]]; then
+
+            echo "Performing initial backup for snapper configuration '$x'. This could take awhile..."
+            btrfs send $new_snapshot | btrfs receive $backup_location
+
+            echo "The latest incremental backup snapshot for snapper configuration '$x' "
+            echo "is $new_number. Do not delete this snapshot, or you when you run this "
+            echo "script again, it will send ALL data again, not just the incremental change. "
+
+        else
+
+            old_snapshot=$SUBVOLUME/.snapshots/$old_number/snapshot
+
+            # Sends the difference between the new snapshot and old snapshot to
+            # the backup location. Using the -c flag instead of -p tells it that
+            # there is an identical subvolume to the old snapshot at the
+            # receiving location where it can get its data. This helps speed up
+            # the transfer.
+            btrfs send $new_snapshot -c $old_snapshot | btrfs receive $backup_location
+
+            cp $new_info $backup_location
+            snapper -c $x delete $old_number
+
+        fi
+
+        # Tag new snapshot as the latest
+        snapper -v -c $x modify -d "$description" -u "$userdata" $new_number 
+
+    fi
+
+done
+
+date > $HOME/.lastbackup
