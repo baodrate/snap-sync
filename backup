@@ -1,7 +1,18 @@
 #!/bin/bash
 # James W. Barnett
 
+# Takes snapshots of each snapper configuration. It then sends the snapshot to
+# a location on an external drive. After the initial transfer, it does
+# incremental snapshots on later calls. It's important not to delete the
+# snapshot created on your system since that will be used to determine the
+# difference for the next incremental snapshot.
+
+# Can set the backup directory here, or in the snapper configuration file with
+# EXT_BACKUP_LOCATION
 declare -r mybackupdir="/run/media/wes/backup/acer-c720"
+
+# You can set a snapper configuration to be excluded by setting EXT_BACKUP="no"
+# in its snapper configuration file.
 
 #--------------------------------------------------------
 # Don't modify anything below here
@@ -15,8 +26,11 @@ fi
 
 declare -r description="latest incremental backup"
 
-# It's important not to change this userdata in the snapshots.
-declare -r userdata="extbackup=yes"
+# It's important not to change this userdata in the snapshots, since that's how
+# we find the previous one.
+UUID="$(blkid -L backup | awk -F'/' '{print $4}')"
+declare -r userdata="uuid=$UUID"
+#declare -r userdata="extbackup=yes"
 declare -r configs="$(find /etc/snapper/configs/* -printf '%f\t\0')"
 
 for x in $configs; do
@@ -31,6 +45,9 @@ for x in $configs; do
 
         if [[ -z $BACKUPDIR ]]; then
             echo "ERROR: External backup location not set!"
+            exit 1
+        elif [[ ! -d $BACKUPDIR ]]; then
+            echo "ERROR: $BACKUPDIR is not a directory."
             exit 1
         fi
 
@@ -49,10 +66,6 @@ for x in $configs; do
 
             echo "Performing initial backup for snapper configuration '$x'. This could take awhile..."
             btrfs send $new_snapshot | btrfs receive $backup_location
-
-            echo "The latest incremental backup snapshot for snapper configuration '$x' "
-            echo "is $new_number. Do not delete this snapshot, or you when you run this "
-            echo "script again, it will send ALL data again, not just the incremental change. "
 
         else
 
