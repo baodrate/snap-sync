@@ -31,9 +31,15 @@ declare -r description="latest incremental backup"
 UUID="$(blkid -L backup | awk -F'/' '{print $4}')"
 declare -r userdata="uuid=$UUID"
 #declare -r userdata="extbackup=yes"
-declare -r configs="$(find /etc/snapper/configs/* -printf '%f\t\0')"
 
-for x in $configs; do
+if [[ -f /etc/conf.d/snapper ]]; then
+    source /etc/conf.d/snapper 
+else
+    echo "ERROR: /etc/conf.d/snapper does not exist!"
+    exit 1
+fi
+
+for x in $SNAPPER_CONFIGS; do
 
     source /etc/snapper/configs/$x
 
