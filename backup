@@ -30,7 +30,6 @@ declare -r description="latest incremental backup"
 # we find the previous one.
 UUID="$(blkid -L backup | awk -F'/' '{print $4}')"
 declare -r userdata="uuid=$UUID"
-#declare -r userdata="extbackup=yes"
 
 if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
