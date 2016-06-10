@@ -41,6 +41,7 @@ fi
 
 for x in $SNAPPER_CONFIGS; do
 
+    # shellcheck source=/dev/null
     source /etc/snapper/configs/$x
 
     do_backup=${EXT_BACKUP:-"yes"}
@@ -57,21 +58,20 @@ for x in $SNAPPER_CONFIGS; do
             exit 1
         fi
 
-        old_number=$(snapper -c $x list -t single | awk '/'"$userdata"'/ {print $1}')
-        new_number="$(snapper -c $x create --print-number)"
+        old_number=$(snapper -c "$x" list -t single | awk '/'"$userdata"'/ {print $1}')
+        new_number=$(snapper -c "$x" create --print-number)
         sync
         
         new_snapshot=$SUBVOLUME/.snapshots/$new_number/snapshot
         new_info=$SUBVOLUME/.snapshots/$new_number/info.xml
         backup_location=$BACKUPDIR/$x/$new_number/
-        old_backup=$BACKUPDIR/$x/$old_number/snapshot
 
-        mkdir -p $backup_location
+        mkdir -p "$backup_location"
 
         if [[ -z "$old_number" ]]; then
 
             echo "Performing initial backup for snapper configuration '$x'. This could take awhile..."
-            btrfs send $new_snapshot | btrfs receive $backup_location
+            btrfs send "$new_snapshot" | btrfs receive "$backup_location"
 
         else
 
@@ -82,18 +82,18 @@ for x in $SNAPPER_CONFIGS; do
             # there is an identical subvolume to the old snapshot at the
             # receiving location where it can get its data. This helps speed up
             # the transfer.
-            btrfs send $new_snapshot -c $old_snapshot | btrfs receive $backup_location
+            btrfs send "$new_snapshot" -c "$old_snapshot" | btrfs receive "$backup_location"
 
-            cp $new_info $backup_location
-            snapper -c $x delete $old_number
+            cp "$new_info" "$backup_location"
+            snapper -c "$x" delete "$old_number"
 
         fi
 
         # Tag new snapshot as the latest
-        snapper -v -c $x modify -d "$description" -u "$userdata" $new_number 
+        snapper -v -c "$x" modify -d "$description" -u "$userdata" "$new_number"
 
     fi
 
 done
 
-date > $HOME/.lastbackup
+date > "$HOME"/.lastbackup
