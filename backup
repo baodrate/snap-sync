@@ -115,13 +115,13 @@ for x in $SNAPPER_CONFIGS; do
             echo "ERROR: Backup location already exists."
             break
         fi
-        mkdir -p "$backup_location"
 
         read -n 1 -p "Continue (y/n)? " cont_backup
         echo
         if [[ "$cont_backup" != "y" ]]; then
             continue
         fi
+        mkdir -p "$backup_location"
 
         old_snapshot=$SUBVOLUME/.snapshots/$old_number/snapshot
 
