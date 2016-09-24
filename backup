@@ -50,11 +50,11 @@ echo "The following mounted BTRFS devices were found."
 disk=0
 while [[ $disk < 1 || $disk > $i ]]; do
     for x in ${!TARGETS_ARRAY[@]}; do
-        echo -e "$x) ${UUIDS_ARRAY[$x]}\t(${TARGETS_ARRAY[$x]})"
+        echo -e "$(($x+1))) ${UUIDS_ARRAY[$x]}\t(${TARGETS_ARRAY[$x]})"
     done
     read -p "Select one: " disk
 done
-selected_uuid="${UUIDS_ARRAY[$disk]}"
+selected_uuid="${UUIDS_ARRAY[$(($disk-1))]}"
 echo "You selected the disk with UUID $selected_uuid."
 
 if [[ -f /etc/conf.d/snapper ]]; then
