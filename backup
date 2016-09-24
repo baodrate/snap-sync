@@ -9,7 +9,9 @@
 
 # Can set the backup directory here, or in the snapper configuration file with
 # EXT_BACKUP_LOCATION
-declare -r mybackupdir="/run/media/wes/backup/acer-c720"
+declare -r mybackupdir="acer-c720"
+declare -r disklabel="backup"
+declare -r description="latest incremental backup"
 
 # You can set a snapper configuration to be excluded by setting EXT_BACKUP="no"
 # in its snapper configuration file.
@@ -24,12 +26,40 @@ if [[ $EUID -ne 0 ]]; then
     exit
 fi
 
-declare -r description="latest incremental backup"
-
 # It's important not to change this userdata in the snapshots, since that's how
 # we find the previous one.
-UUID="$(blkid -L backup | awk -F'/' '{print $4}')"
-declare -r userdata="uuid=$UUID"
+
+TARGETS="$(findmnt -n -v -t btrfs -o TARGET --list)"
+declare -a UUIDS
+UUIDS="$(findmnt -n -v -t btrfs -o UUID --list)"
+menu=0
+
+declare -a TARGETS_ARRAY
+declare -a UUIDS_ARRAY
+
+i=0
+for x in $TARGETS; do
+    TARGETS_ARRAY[$i]=$x
+    i=$(($i+1))
+done
+i=0
+for x in $UUIDS; do
+    UUIDS_ARRAY[$i]=$x
+    i=$(($i+1))
+done
+total_mounted=$i
+echo "The following mounted BTRFS devices were found."
+disk=0
+while [[ $disk < 1 || $disk > $i ]]; do
+    for x in ${!TARGETS_ARRAY[@]}; do
+        echo -e "$x) ${UUIDS_ARRAY[$x]}\t(${TARGETS_ARRAY[$x]})"
+    done
+    read -p "Select one: " disk
+done
+selected_uuid="${UUIDS_ARRAY[$disk]}"
+echo "You selected the disk with UUID $selected_uuid."
+
+declare -r userdata="backupdir=$mybackupdir, uuid=$selected_uuid"
 
 if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
@@ -38,21 +68,21 @@ else
     exit 1
 fi
 
+echo "Performing backup..."
+
 for x in $SNAPPER_CONFIGS; do
 
     # shellcheck source=/dev/null
     source /etc/snapper/configs/$x
 
-    do_backup=${EXT_BACKUP:-"yes"}
+    read -n 1 -p "Perform backup on '$x' configuration (y/n)? " do_backup
+    echo
 
-    if [[ $do_backup == "yes" ]]; then
+    if [[ $do_backup == "y" ]]; then
 
-        BACKUPDIR=${EXT_BACKUP_LOCATION:-"$mybackupdir"}
+        BACKUPDIR="$(findmnt -n -v -t btrfs -o UUID,TARGET --list | awk '/'$selected_uuid'/ {print $2}')/$mybackupdir"
 
-        if [[ -z $BACKUPDIR ]]; then
-            echo "ERROR: External backup location not set!"
-            exit 1
-        elif [[ ! -d $BACKUPDIR ]]; then
+        if [[ ! -d $BACKUPDIR ]]; then
             echo "ERROR: $BACKUPDIR is not a directory."
             exit 1
         fi
@@ -65,6 +95,19 @@ for x in $SNAPPER_CONFIGS; do
         new_info=$SUBVOLUME/.snapshots/$new_number/info.xml
         backup_location=$BACKUPDIR/$x/$new_number/
 
+        echo "Backup location:"
+        echo "$backup_location"
+
+        read -n 1 -p "Continue (y/n)? " cont_backup
+        echo
+        if [[ "$cont_backup" != "y" ]]; then
+            break
+        fi
+        
+        if [[ -d "$backup_location" ]]; then
+            echo "ERROR: Backup location already exists."
+            break
+        fi
         mkdir -p "$backup_location"
 
         if [[ -z "$old_number" ]]; then
@@ -81,7 +124,7 @@ for x in $SNAPPER_CONFIGS; do
             # there is an identical subvolume to the old snapshot at the
             # receiving location where it can get its data. This helps speed up
             # the transfer.
-            btrfs send "$new_snapshot" -c "$old_snapshot" | btrfs receive "$backup_location"
+            btrfs send "$new_snapshot" -c "$old_snapshot" | btrfs receive "$backup_location" &>/dev/null
 
             cp "$new_info" "$backup_location"
             snapper -c "$x" delete "$old_number"
@@ -93,6 +136,9 @@ for x in $SNAPPER_CONFIGS; do
 
     fi
 
+
 done
 
 date > "$HOME"/.lastbackup
+
+echo "Done!"
