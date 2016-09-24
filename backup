@@ -9,8 +9,6 @@
 
 # Can set the backup directory here, or in the snapper configuration file with
 # EXT_BACKUP_LOCATION
-declare -r mybackupdir="acer-c720"
-declare -r disklabel="backup"
 declare -r description="latest incremental backup"
 
 # You can set a snapper configuration to be excluded by setting EXT_BACKUP="no"
@@ -59,8 +57,6 @@ done
 selected_uuid="${UUIDS_ARRAY[$disk]}"
 echo "You selected the disk with UUID $selected_uuid."
 
-declare -r userdata="backupdir=$mybackupdir, uuid=$selected_uuid"
-
 if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
 else
@@ -80,42 +76,54 @@ for x in $SNAPPER_CONFIGS; do
 
     if [[ $do_backup == "y" ]]; then
 
-        BACKUPDIR="$(findmnt -n -v -t btrfs -o UUID,TARGET --list | awk '/'$selected_uuid'/ {print $2}')/$mybackupdir"
-
-        if [[ ! -d $BACKUPDIR ]]; then
-            echo "ERROR: $BACKUPDIR is not a directory."
-            exit 1
-        fi
-
-        old_number=$(snapper -c "$x" list -t single | awk '/'"$userdata"'/ {print $1}')
+        old_number=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
         new_number=$(snapper -c "$x" create --print-number)
         sync
         
         new_snapshot=$SUBVOLUME/.snapshots/$new_number/snapshot
         new_info=$SUBVOLUME/.snapshots/$new_number/info.xml
-        backup_location=$BACKUPDIR/$x/$new_number/
-
-        echo "Backup location:"
-        echo "$backup_location"
-
-        read -n 1 -p "Continue (y/n)? " cont_backup
-        echo
-        if [[ "$cont_backup" != "y" ]]; then
-            break
-        fi
-        
-        if [[ -d "$backup_location" ]]; then
-            echo "ERROR: Backup location already exists."
-            break
-        fi
-        mkdir -p "$backup_location"
 
         if [[ -z "$old_number" ]]; then
 
+            echo "No backups have been performed for '$x' on this disk."
+            read -p "Enter name of directory to store backups: " mybackupdir
+
+            BACKUPDIR="$(findmnt -n -v -t btrfs -o UUID,TARGET --list | awk '/'$selected_uuid'/ {print $2}')/$mybackupdir"
+            backup_location=$BACKUPDIR/$x/$new_number/
+            echo "Backup location: $backup_location"
+            read -n 1 -p "Continue (y/n)? " cont_backup
+            echo
+            if [[ "$cont_backup" != "y" ]]; then
+                continue
+            fi
+            mkdir -p "$backup_location"
             echo "Performing initial backup for snapper configuration '$x'. This could take awhile..."
             btrfs send "$new_snapshot" | btrfs receive "$backup_location"
 
         else
+
+            mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'$selected_uuid'/ {print $5}' | awk -F "," '{print $1}' | awk -F"=" '{print $2}')
+            BACKUPDIR="$(findmnt -n -v -t btrfs -o UUID,TARGET --list | awk '/'$selected_uuid'/ {print $2}')/$mybackupdir"
+
+            if [[ ! -d $BACKUPDIR ]]; then
+                echo "ERROR: $BACKUPDIR is not a directory."
+                exit 1
+            fi
+
+            backup_location=$BACKUPDIR/$x/$new_number/
+
+            echo "Backup location: $backup_location"
+            if [[ -d "$backup_location" ]]; then
+                echo "ERROR: Backup location already exists."
+                break
+            fi
+            mkdir -p "$backup_location"
+
+            read -n 1 -p "Continue (y/n)? " cont_backup
+            echo
+            if [[ "$cont_backup" != "y" ]]; then
+                continue
+            fi
 
             old_snapshot=$SUBVOLUME/.snapshots/$old_number/snapshot
 
@@ -130,6 +138,8 @@ for x in $SNAPPER_CONFIGS; do
             snapper -c "$x" delete "$old_number"
 
         fi
+
+        userdata="backupdir=$mybackupdir, uuid=$selected_uuid"
 
         # Tag new snapshot as the latest
         snapper -v -c "$x" modify -d "$description" -u "$userdata" "$new_number"
