@@ -46,18 +46,19 @@ for x in $UUIDS; do
     i=$(($i+1))
 done
 total_mounted=$i
-echo "Selected a mounted BTRFS device to backup to:"
+echo "Selected a mounted BTRFS device to backup to."
 while [[ $disk < 0 || $disk > $i ]]; do
     for x in ${!TARGETS_ARRAY[@]}; do
         echo -e "$(($x+1))) ${UUIDS_ARRAY[$x]}\t(${TARGETS_ARRAY[$x]})"
     done
     echo "0) Exit"
-    read -p "Select one: " disk
+    read -p "Enter a number: " disk
 done
 if [[ $disk == 0 ]]; then
     exit 0
 fi
 selected_uuid="${UUIDS_ARRAY[$(($disk-1))]}"
+selected_mnt="${TARGETS_ARRAY[$(($disk-1))]}"
 echo "You selected the disk with UUID $selected_uuid."
 
 if [[ -f /etc/conf.d/snapper ]]; then
@@ -69,72 +70,57 @@ fi
 
 for x in $SNAPPER_CONFIGS; do
 
-    # shellcheck source=/dev/null
     source /etc/snapper/configs/$x
 
+    echo "At '$x' configuration"
 
     old_number=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
+    old_snapshot=$SUBVOLUME/.snapshots/$old_number/snapshot
+
+    if [[ -z "$old_number" ]]; then
+        echo "No backups have been performed for '$x' on this disk."
+        read -p "Enter name of directory to store backups: " mybackupdir
+        echo "This will be the initial backup for snapper configuration '$x' to this disk. This could take awhile."
+        BACKUPDIR="$selected_mnt/$mybackupdir"
+        mkdir -p $BACKUPDIR
+    else
+        mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'$selected_uuid'/ {print $5}' | awk -F "," '{print $1}' | awk -F"=" '{print $2}')
+        BACKUPDIR="$selected_mnt/$mybackupdir"
+        if [[ ! -d $BACKUPDIR ]]; then
+            echo "ERROR: $BACKUPDIR is not a directory on $selected_uuid."
+            exit 1
+        fi
+    fi
+
     new_number=$(snapper -c "$x" create --print-number)
-    sync
-    
     new_snapshot=$SUBVOLUME/.snapshots/$new_number/snapshot
     new_info=$SUBVOLUME/.snapshots/$new_number/info.xml
-    echo "At '$x' configuration"
+    sync
+    backup_location=$BACKUPDIR/$x/$new_number/
+    echo "Backup location: $backup_location"
+
+    read -n 1 -p "Continue (y/n)? " cont_backup
+    echo
+    if [[ "$cont_backup" != "y" ]]; then
+        continue
+    fi
+
+    mkdir -p "$backup_location"
+
 
     if [[ -z "$old_number" ]]; then
 
-        echo "No backups have been performed for '$x' on this disk."
-        read -p "Enter name of directory to store backups: " mybackupdir
-
-        BACKUPDIR="$(findmnt -n -v -t btrfs -o UUID,TARGET --list | awk '/'$selected_uuid'/ {print $2}')/$mybackupdir"
-        backup_location=$BACKUPDIR/$x/$new_number/
-        echo "This will be the initial backup for snapper configuration '$x' to this disk. This could take awhile."
-        echo "Backup location: $backup_location"
-        read -n 1 -p "Continue (y/n)? " cont_backup
-        echo
-        if [[ "$cont_backup" != "y" ]]; then
-            continue
-        fi
-        mkdir -p "$backup_location"
         btrfs send "$new_snapshot" | btrfs receive "$backup_location"
 
     else
 
-        mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'$selected_uuid'/ {print $5}' | awk -F "," '{print $1}' | awk -F"=" '{print $2}')
-        BACKUPDIR="$(findmnt -n -v -t btrfs -o UUID,TARGET --list | awk '/'$selected_uuid'/ {print $2}')/$mybackupdir"
-
-        if [[ ! -d $BACKUPDIR ]]; then
-            echo "ERROR: $BACKUPDIR is not a directory."
-            exit 1
-        fi
-
-        backup_location=$BACKUPDIR/$x/$new_number/
-
-        echo "Backup location: $backup_location"
-        if [[ -d "$backup_location" ]]; then
-            echo "ERROR: Backup location already exists."
-            break
-        fi
-
-        read -n 1 -p "Continue (y/n)? " cont_backup
-        echo
-        if [[ "$cont_backup" != "y" ]]; then
-            continue
-        fi
-        mkdir -p "$backup_location"
-
-        old_snapshot=$SUBVOLUME/.snapshots/$old_number/snapshot
-
-        # Sends the difference between the new snapshot and old snapshot to
-        # the backup location. Using the -c flag instead of -p tells it that
-        # there is an identical subvolume to the old snapshot at the
-        # receiving location where it can get its data. This helps speed up
-        # the transfer.
+        # Sends the difference between the new snapshot and old snapshot to the
+        # backup location. Using the -c flag instead of -p tells it that there
+        # is an identical subvolume to the old snapshot at the receiving
+        # location where it can get its data. This helps speed up the transfer.
         btrfs send "$new_snapshot" -c "$old_snapshot" | btrfs receive "$backup_location" &>/dev/null
-
         cp "$new_info" "$backup_location"
         snapper -c "$x" delete "$old_number"
-
     fi
 
     userdata="backupdir=$mybackupdir, uuid=$selected_uuid"
