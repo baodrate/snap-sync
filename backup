@@ -28,9 +28,7 @@ fi
 # we find the previous one.
 
 TARGETS="$(findmnt -n -v -t btrfs -o TARGET --list)"
-declare -a UUIDS
 UUIDS="$(findmnt -n -v -t btrfs -o UUID --list)"
-menu=0
 
 declare -a TARGETS_ARRAY
 declare -a UUIDS_ARRAY
@@ -38,27 +36,26 @@ declare -a UUIDS_ARRAY
 i=0
 for x in $TARGETS; do
     TARGETS_ARRAY[$i]=$x
-    i=$(($i+1))
+    i=$((i+1))
 done
 i=0
 for x in $UUIDS; do
     UUIDS_ARRAY[$i]=$x
-    i=$(($i+1))
+    i=$((i+1))
 done
-total_mounted=$i
 echo "Selected a mounted BTRFS device to backup to."
-while [[ $disk < 0 || $disk > $i ]]; do
-    for x in ${!TARGETS_ARRAY[@]}; do
-        echo -e "$(($x+1))) ${UUIDS_ARRAY[$x]}\t(${TARGETS_ARRAY[$x]})"
+while [[ $disk -lt 0 || $disk -gt $i ]]; do
+    for x in "${!TARGETS_ARRAY[@]}"; do
+        echo -e "$((x+1))) ${UUIDS_ARRAY[$x]}\t(${TARGETS_ARRAY[$x]})"
     done
     echo "0) Exit"
-    read -p "Enter a number: " disk
+    read -r -p "Enter a number: " disk
 done
 if [[ $disk == 0 ]]; then
     exit 0
 fi
-selected_uuid="${UUIDS_ARRAY[$(($disk-1))]}"
-selected_mnt="${TARGETS_ARRAY[$(($disk-1))]}"
+selected_uuid="${UUIDS_ARRAY[$((disk-1))]}"
+selected_mnt="${TARGETS_ARRAY[$((disk-1))]}"
 echo "You selected the disk with UUID $selected_uuid."
 
 if [[ -f /etc/conf.d/snapper ]]; then
@@ -79,10 +76,10 @@ for x in $SNAPPER_CONFIGS; do
 
     if [[ -z "$old_number" ]]; then
         echo "No backups have been performed for '$x' on this disk."
-        read -p "Enter name of directory to store backups: " mybackupdir
+        read -r -p "Enter name of directory to store backups: " mybackupdir
         echo "This will be the initial backup for snapper configuration '$x' to this disk. This could take awhile."
         BACKUPDIR="$selected_mnt/$mybackupdir"
-        mkdir -p $BACKUPDIR
+        mkdir -p "$BACKUPDIR"
     else
         mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'$selected_uuid'/ {print $5}' | awk -F "," '{print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
@@ -99,7 +96,7 @@ for x in $SNAPPER_CONFIGS; do
     backup_location=$BACKUPDIR/$x/$new_number/
     echo "Backup location: $backup_location"
 
-    read -n 1 -p "Continue (y/n)? " cont_backup
+    read -r -n 1 -p "Continue (y/n)? " cont_backup
     echo
     if [[ "$cont_backup" != "y" ]]; then
         continue
