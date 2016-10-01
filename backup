@@ -44,6 +44,7 @@ for x in $UUIDS; do
     i=$((i+1))
 done
 echo "Selected a mounted BTRFS device to backup to."
+disk=-1
 while [[ $disk -lt 0 || $disk -gt $i ]]; do
     for x in "${!TARGETS_ARRAY[@]}"; do
         echo -e "$((x+1))) ${UUIDS_ARRAY[$x]}\t(${TARGETS_ARRAY[$x]})"
