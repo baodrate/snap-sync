@@ -3,7 +3,7 @@
 ## About
 
 This bash script sends incremental snapshots to another drive for backing up
-data. Plug in and mountany btrfs-formatted device you want your system to be
+data. Plug in and mount any btrfs-formatted device you want your system to be
 backed up to (like a USB drive).  When you run the script you will be prompted
 to select a mounted btrfs device.
 
@@ -20,7 +20,7 @@ snapper is required.
 
 ## Example output
 
-    $ ./backup
+    # snap-sync
 
     Selected a mounted BTRFS device to backup to.
     1) 43cedfb6-8775-43be-8abc-ee63bb92e10e (/)
