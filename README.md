@@ -14,9 +14,13 @@ snapshots will go. Additionally you are show the location of the backed up
 snapshot. If you have performed a backup to this device before, only the changes
 since the last backup have to be sent.
 
+## Requirements
+
 snapper is required.
 
 ## Example output
+
+    $ ./backup
 
     Selected a mounted BTRFS device to backup to.
     1) 43cedfb6-8775-43be-8abc-ee63bb92e10e (/)
@@ -35,3 +39,15 @@ snapper is required.
     Continue (y/n)? y
     At subvol //.snapshots/2288/snapshot
     Done!
+
+The related snapshots from this on the local machine are for `home`:
+
+    single | 1097 |       | Sat 01 Oct 2016 07:48:40 AM CDT | root |          | latest incremental backup | backupdir=acer-c720, uuid=7360922b-c916-4d9f-a670-67fe0b91143c
+
+and for `root`:
+
+    single | 2288 |       | Sat 01 Oct 2016 07:50:56 AM CDT | root |          | latest incremental backup | backupdir=acer-c720, uuid=7360922b-c916-4d9f-a670-67fe0b91143c
+
+As you can see the userdata column for snapper is used to keep track of these
+snapshots for the next time the script is run so that only the changes will need
+to be sent.
