@@ -7,17 +7,9 @@
 # snapshot created on your system since that will be used to determine the
 # difference for the next incremental snapshot.
 
-# Can set the backup directory here, or in the snapper configuration file with
-# EXT_BACKUP_LOCATION
-declare -r description="latest incremental backup"
-
-# You can set a snapper configuration to be excluded by setting EXT_BACKUP="no"
-# in its snapper configuration file.
-
-#--------------------------------------------------------
-# Don't modify anything below here
-
 set -e
+
+declare -r description="latest incremental backup"
 
 if [[ $EUID -ne 0 ]]; then
     printf "Script must be run as root.\n" 
@@ -108,7 +100,7 @@ for x in $SNAPPER_CONFIGS; do
 
     if [[ -z "$old_number" ]]; then
 
-        btrfs send "$new_snapshot" | btrfs receive "$backup_location"
+        btrfs send "$new_snapshot" | btrfs receive "$backup_location" &>/dev/null
 
     else
 
@@ -127,7 +119,5 @@ for x in $SNAPPER_CONFIGS; do
     snapper -v -c "$x" modify -d "$description" -u "$userdata" "$new_number"
 
 done
-
-date > "$HOME"/.lastbackup
 
 printf "Done!\n"
