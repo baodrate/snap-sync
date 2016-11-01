@@ -89,9 +89,10 @@ for x in $SNAPPER_CONFIGS; do
     backup_location=$BACKUPDIR/$x/$new_number/
     printf "Backup location: %s\n" "$backup_location"
 
-    read -r -n 1 -p "Continue (y/n)? " cont_backup
+    read -r -p "Continue [Y/n]? " cont_backup
     printf "\n"
-    if [[ "$cont_backup" != "y" ]]; then
+    if [[ "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] ]]; then
+        printf "Skipping this configuration.\n"
         continue
     fi
 
