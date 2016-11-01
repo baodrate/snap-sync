@@ -69,7 +69,7 @@ for x in $SNAPPER_CONFIGS; do
 
     if [[ -z "$old_number" ]]; then
         printf "No backups have been performed for '%s' on this disk.\n" "$x"
-        read -r -p "Enter name of directory to store backups: " mybackupdir
+        read -r -p "Enter name of directory to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
         printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
         BACKUPDIR="$selected_mnt/$mybackupdir"
         mkdir -p "$BACKUPDIR"
