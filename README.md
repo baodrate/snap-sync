@@ -10,7 +10,7 @@ to select a mounted btrfs device.
 The script iterates through all snapper configurations. For each configuration
 it creates a new local snapshot. If you have never synced to the specified
 device you will be prompted to enter a directory on the device where the backup
-snapshots will go. Additionally you are show the location of the backed up
+snapshots will go. Additionally you are shown the location of the backed up
 snapshot. If you have performed a backup to this device before, only the changes
 since the last backup have to be sent.
 
