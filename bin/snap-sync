@@ -20,15 +20,15 @@ while [[ $# -gt 0 ]]; do
             uuid_cmdline="$2"
             shift
         ;;
-# TODO: add more
+# TODO: add more, make a function
         -h|--help)
-            echo "Usage:"
-            echo "    snap-sync -d 'Snapshot description'"
+            printf "Usage:"
+            printf "    snap-sync -d 'Snapshot description' -u device-UUID"
             shift
             exit 1
         ;;
         *)
-            echo "Error: unknown option."
+            printf "Error: unknown option."
             exit 1
         ;;
     esac
