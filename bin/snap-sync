@@ -9,7 +9,33 @@
 
 set -e
 
-declare -r description="latest incremental backup"
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -d|--description)
+            description="$2"
+            shift
+        ;;
+#TODO   -u|--UUID)
+#           uuid_cmdline="$2"
+#           shift
+#       ;;
+# TODO: add more
+        -h|--help)
+            echo "Usage:"
+            echo "    snap-sync -d 'Snapshot description'"
+            shift
+            exit 1
+        ;;
+        *)
+            echo "Error: unknown option."
+            exit 1
+        ;;
+    esac
+    shift
+done
+
+description=${description:-"latest incremental backup"}
 
 if [[ $EUID -ne 0 ]]; then
     printf "Script must be run as root.\n" 
