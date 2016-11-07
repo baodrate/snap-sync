@@ -7,6 +7,8 @@
 # snapshot created on your system since that will be used to determine the
 # difference for the next incremental snapshot.
 
+version="0.2"
+
 set -e
 
 while [[ $# -gt 0 ]]; do
@@ -29,14 +31,21 @@ while [[ $# -gt 0 ]]; do
             shift
         ;;
         -h|--help)
-            printf "Usage:\n"
-            printf "    snap-sync -d 'Snapshot description' -u device-UUID -c config\n"
+            printf "snap-sync $version\n\n"
+            printf "Usage: snap-sync [options]\n\n"
+            printf "Options:\n"
+            printf " -d, --description <desc> Change the snapper description. Default: \"latest incremental backup\"\n"
+            printf " -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper\n"
+            printf "                          configuration. Can list multiple configurations within quotes, space-separated\n"
+            printf "                          (e.g. -c \"root home\").\n"
+            printf " -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup\n"
+            printf "                          directory name on first backup\n"
+            printf " -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.\n"
             exit 1
         ;;
         *)
             printf "Error: Unknown option: $key\n"
-            printf "Usage:\n"
-            printf "    snap-sync -d 'Snapshot description' -u device-UUID -c config\n"
+            printf "Run 'snap-sync -h' for valid options.\n"
             exit 1
         ;;
     esac
