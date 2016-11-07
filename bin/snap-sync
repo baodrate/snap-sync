@@ -14,35 +14,37 @@ while [[ $# -gt 0 ]]; do
     case $key in
         -d|--description)
             description="$2"
-            shift
+            shift 2
         ;;
         -c|--config)
             selected_configs="$2"
-            shift
+            shift 2
         ;;
         -u|--UUID)
             uuid_cmdline="$2"
+            shift 2
+        ;;
+        -n|--noconfirm)
+            noconfirm="yes"
             shift
         ;;
-# TODO: make a function
         -h|--help)
-            printf "Usage:"
-            printf "    snap-sync -d 'Snapshot description' -u device-UUID -c config"
-            shift
+            printf "Usage:\n"
+            printf "    snap-sync -d 'Snapshot description' -u device-UUID -c config\n"
             exit 1
         ;;
         *)
-            printf "Error: unknown option."
-            printf "Usage:"
-            printf "    snap-sync -d 'Snapshot description' -u device-UUID -c config"
+            printf "Error: Unknown option: $key\n"
+            printf "Usage:\n"
+            printf "    snap-sync -d 'Snapshot description' -u device-UUID -c config\n"
             exit 1
         ;;
     esac
-    shift
 done
 
 description=${description:-"latest incremental backup"}
 uuid_cmdline=${uuid_cmdline:-"none"}
+noconfirm=${noconfirm:-"no"}
 
 if [[ $EUID -ne 0 ]]; then
     printf "Script must be run as root.\n" 
@@ -141,12 +143,18 @@ for x in $selected_configs; do
     backup_location=$BACKUPDIR/$x/$new_number/
     printf "Backup location: %s\n" "$backup_location"
 
-    read -r -p "Continue [Y/n]? " cont_backup
-    printf "\n"
+    if [[ ! $noconfirm ]]; then
+        cont_backup="yes"
+    else
+        read -r -p "Continue [Y/n]? " cont_backup
+        printf "\n"
+    fi
+
     if [[ "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] ]]; then
         printf "Skipping this configuration.\n"
         continue
     fi
+
 
     mkdir -p "$backup_location"
 
