@@ -16,6 +16,10 @@ while [[ $# -gt 0 ]]; do
             description="$2"
             shift
         ;;
+        -c|--config)
+            selected_configs="$2"
+            shift
+        ;;
         -u|--UUID)
             uuid_cmdline="$2"
             shift
@@ -89,7 +93,6 @@ fi
 selected_uuid="${UUIDS_ARRAY[$((disk-1))]}"
 selected_mnt="${TARGETS_ARRAY[$((disk-1))]}"
 printf "You selected the disk with UUID %s.\n" "$selected_uuid"
-exit 0
 
 if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
@@ -98,9 +101,17 @@ else
     exit 1
 fi
 
-for x in $SNAPPER_CONFIGS; do
+selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
+echo $selected_configs
 
-    source /etc/snapper/configs/$x
+for x in $selected_configs; do
+
+    if [[ -d "/etc/snapper/configs/$x" ]]; then
+        source /etc/snapper/configs/$x
+    else
+        printf "Error: Selected snapper configuration $x does not exist."
+        exit 1
+    fi
 
     printf "At '%s' configuration\n" "$x"
 
