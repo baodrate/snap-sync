@@ -16,10 +16,10 @@ while [[ $# -gt 0 ]]; do
             description="$2"
             shift
         ;;
-#TODO   -u|--UUID)
-#           uuid_cmdline="$2"
-#           shift
-#       ;;
+        -u|--UUID)
+            uuid_cmdline="$2"
+            shift
+        ;;
 # TODO: add more
         -h|--help)
             echo "Usage:"
@@ -36,6 +36,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 description=${description:-"latest incremental backup"}
+uuid_cmdline=${uuid_cmdline:-"interactive"}
 
 if [[ $EUID -ne 0 ]]; then
     printf "Script must be run as root.\n" 
@@ -52,30 +53,43 @@ declare -a TARGETS_ARRAY
 declare -a UUIDS_ARRAY
 
 i=0
+disk=-1
+for x in $UUIDS; do
+    UUIDS_ARRAY[$i]=$x
+    if [[ "$x" == "$uuid_cmdline" ]]; then
+        disk=$i
+    fi
+    i=$((i+1))
+done
+
+i=0
 for x in $TARGETS; do
     TARGETS_ARRAY[$i]=$x
     i=$((i+1))
 done
-i=0
-for x in $UUIDS; do
-    UUIDS_ARRAY[$i]=$x
-    i=$((i+1))
-done
-printf "Select a mounted BTRFS device to backup to.\n"
-disk=-1
-while [[ $disk -lt 0 || $disk -gt $i ]]; do
-    for x in "${!TARGETS_ARRAY[@]}"; do
-        printf "%s) %s (%s)\n" "$((x+1))" "${UUIDS_ARRAY[$x]}" "${TARGETS_ARRAY[$x]}"
+
+if [[ "$disk" == -1 ]]; then
+    if [[ "$uuid_cmdline" != "none" ]]; then
+        printf "A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device."
+    fi
+    printf "Select a mounted BTRFS device to backup to.\n"
+    disk=-1
+    while [[ $disk -lt 0 || $disk -gt $i ]]; do
+        for x in "${!TARGETS_ARRAY[@]}"; do
+            printf "%s) %s (%s)\n" "$((x+1))" "${UUIDS_ARRAY[$x]}" "${TARGETS_ARRAY[$x]}"
+        done
+        printf "0) Exit\n"
+        read -r -p "Enter a number: " disk
     done
-    printf "0) Exit\n"
-    read -r -p "Enter a number: " disk
-done
-if [[ $disk == 0 ]]; then
-    exit 0
+    if [[ $disk == 0 ]]; then
+        exit 0
+    fi
 fi
+
 selected_uuid="${UUIDS_ARRAY[$((disk-1))]}"
 selected_mnt="${TARGETS_ARRAY[$((disk-1))]}"
 printf "You selected the disk with UUID %s.\n" "$selected_uuid"
+exit 0
 
 if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
