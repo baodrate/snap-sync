@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 description=${description:-"latest incremental backup"}
-uuid_cmdline=${uuid_cmdline:-"interactive"}
+uuid_cmdline=${uuid_cmdline:-"none"}
 
 if [[ $EUID -ne 0 ]]; then
     printf "Script must be run as root.\n" 
