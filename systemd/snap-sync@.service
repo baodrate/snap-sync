@@ -1,5 +1,5 @@
 [Unit]
-Description=snap-sync
+Description=snap-sync (UUID: %i)
 
 [Install]
 WantedBy=multi-user.target
