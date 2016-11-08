@@ -100,10 +100,11 @@ if [[ "$disk" == -1 ]]; then
     if [[ $disk == 0 ]]; then
         exit 0
     fi
+    disk=$(($disk-1))
 fi
 
-selected_uuid="${UUIDS_ARRAY[$((disk-1))]}"
-selected_mnt="${TARGETS_ARRAY[$((disk-1))]}"
+selected_uuid="${UUIDS_ARRAY[$((disk))]}"
+selected_mnt="${TARGETS_ARRAY[$((disk))]}"
 printf "You selected the disk with UUID %s.\n" "$selected_uuid"
 
 if [[ -f /etc/conf.d/snapper ]]; then
@@ -114,11 +115,10 @@ else
 fi
 
 selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
-echo $selected_configs
 
 for x in $selected_configs; do
 
-    if [[ -d "/etc/snapper/configs/$x" ]]; then
+    if [[ -f "/etc/snapper/configs/$x" ]]; then
         source /etc/snapper/configs/$x
     else
         printf "Error: Selected snapper configuration $x does not exist."
@@ -152,7 +152,7 @@ for x in $selected_configs; do
     backup_location=$BACKUPDIR/$x/$new_number/
     printf "Backup location: %s\n" "$backup_location"
 
-    if [[ ! $noconfirm ]]; then
+    if [[ $noconfirm == "yes" ]]; then
         cont_backup="yes"
     else
         read -r -p "Continue [Y/n]? " cont_backup
