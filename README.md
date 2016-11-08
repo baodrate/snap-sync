@@ -16,20 +16,6 @@ Additionally you are shown the location of the backed up snapshot. If you have
 performed a backup to this device before, only the changes since the last backup
 have to be sent.
 
-## Options
-
-	Usage: snap-sync [options]
-
-	Options:
-	 -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
-	 -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper
-							  configuration. Can list multiple configurations within quotes, space-separated
-							  (e.g. -c "root home").
-	 -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
-							  directory name on first backup
-	 -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
-							  If multiple mount points are found with the same UUID, will prompt user.
-
 ## Requirements
 
 snapper is required.
@@ -97,7 +83,7 @@ As you can see the userdata column for snapper is used to keep track of these
 snapshots for the next time the script is run so that only the changes will need
 to be sent.
 
-### With UUID specified and on confirmations
+### With UUID specified and no confirmations
 
     # snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --noconfirm
 
