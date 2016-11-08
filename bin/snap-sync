@@ -41,6 +41,7 @@ while [[ $# -gt 0 ]]; do
             printf " -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup\n"
             printf "                          directory name on first backup\n"
             printf " -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.\n"
+            printf "                          If multiple mount points are found with the same UUID, will prompt user.\n"
             exit 1
         ;;
         *)
@@ -71,10 +72,12 @@ declare -a UUIDS_ARRAY
 
 i=0
 disk=-1
+disk_count=0
 for x in $UUIDS; do
     UUIDS_ARRAY[$i]=$x
     if [[ "$x" == "$uuid_cmdline" ]]; then
         disk=$i
+        disk_count=$(($disk_count+1))
     fi
     i=$((i+1))
 done
@@ -85,8 +88,13 @@ for x in $TARGETS; do
     i=$((i+1))
 done
 
+if [[ "$disk_count" > 1 ]]; then
+    printf "Multiple mount points were found with UUID $uuid_cmdline.\n"
+    disk="-1"
+fi
+
 if [[ "$disk" == -1 ]]; then
-    if [[ "$uuid_cmdline" != "none" ]]; then
+    if [[ "$disk_count" == 0 ]]; then
         printf "A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device.\n"
     fi
     printf "Select a mounted BTRFS device to backup to.\n"
@@ -106,6 +114,7 @@ fi
 selected_uuid="${UUIDS_ARRAY[$((disk))]}"
 selected_mnt="${TARGETS_ARRAY[$((disk))]}"
 printf "You selected the disk with UUID %s.\n" "$selected_uuid"
+printf "The disk is mounted at %s.\n" "$selected_mnt"
 
 if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
