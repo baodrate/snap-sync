@@ -199,4 +199,4 @@ for x in $selected_configs; do
 
 done
 
-printf "Done!\n"
+printf "\nDone!\n"

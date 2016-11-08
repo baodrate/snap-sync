@@ -59,16 +59,18 @@ The timer included is weekly. Edit both files to your taste.
     4) 7360922b-c916-4d9f-a670-67fe0b91143c (/run/media/wes/backup)
     0) Exit
     Enter a number: 4
+
     You selected the disk with UUID 7360922b-c916-4d9f-a670-67fe0b91143c.
     The disk is mounted at /run/media/wes/backup.
-    At 'home' configuration
-    Backup location: /run/media/wes/backup/acer-c720/home/1097/
-    Continue [Y/n]? y
+
+    Will backup /home/.snapshots/1097/snapshot to /run/media/wes/backup/acer-c720/home/1097//snapshot
+    Continue with backup [Y/n]? y
     At subvol /home/.snapshots/1097/snapshot
-    At 'root' configuration
-    Backup location: /run/media/wes/backup/acer-c720/root/2288/
-    Continue [Y/n]? y
+
+    Will backup //.snapshots/2288/snapshot to /run/media/wes/backup/acer-c720/root/2288//snapshot
+    Continue with backup [Y/n]? y
     At subvol //.snapshots/2288/snapshot
+
     Done!
 
 The related snapshots from this on the local machine are for `home`:
@@ -86,13 +88,14 @@ to be sent.
 ### With UUID specified and no confirmations
 
     # snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --noconfirm
-
     You selected the disk with UUID 7360922b-c916-4d9f-a670-67fe0b91143c.
     The disk is mounted at /run/media/wes/backup.
-    At 'home' configuration
-    Backup location: /run/media/wes/backup/acer-c720/home/1373/
-    At subvol /home/.snapshots/1373/snapshot
-    At 'root' configuration
-    Backup location: /run/media/wes/backup/acer-c720/root/2777/
-    At subvol //.snapshots/2777/snapshot
+
+    Will backup /home/.snapshots/1379/snapshot to /run/media/wes/backup/acer-c720/home/1379//snapshot
+    At subvol /home/.snapshots/1379/snapshot
+
+    Will backup //.snapshots/2782/snapshot to /run/media/wes/backup/acer-c720/root/2782//snapshot
+    At subvol //.snapshots/2782/snapshot
+
     Done!
+
