@@ -165,7 +165,6 @@ for x in $selected_configs; do
         cont_backup="yes"
     else
         read -r -p "Continue [Y/n]? " cont_backup
-        printf "\n"
     fi
 
     if [[ "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] ]]; then
