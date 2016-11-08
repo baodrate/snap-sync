@@ -1,0 +1,12 @@
+[Unit]
+Description=snap-sync
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=simple
+
+ExecStart=/usr/bin/snap-sync \
+          --UUID %i \
+          --noconfirm
