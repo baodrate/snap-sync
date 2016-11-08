@@ -24,3 +24,4 @@ BIN_DIR = $(DESTDIR)$(PREFIX)/bin
 
 install:
 	@install -Dm755 bin/* -t $(BIN_DIR)/
+	@install -Dm755 systemd/* -t $(PREFIX)/lib/systemd/system/

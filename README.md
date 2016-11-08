@@ -16,6 +16,20 @@ Additionally you are shown the location of the backed up snapshot. If you have
 performed a backup to this device before, only the changes since the last backup
 have to be sent.
 
+## Options
+
+	Usage: snap-sync [options]
+
+	Options:
+	 -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
+	 -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper
+							  configuration. Can list multiple configurations within quotes, space-separated
+							  (e.g. -c "root home").
+	 -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
+							  directory name on first backup
+	 -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
+							  If multiple mount points are found with the same UUID, will prompt user.
+
 ## Requirements
 
 snapper is required.
@@ -44,11 +58,15 @@ place. Example:
 
     # systemctl start snap-sync@7360922b-c916-4d9f-a670-67fe0b91143c
 
-## Example output
+The timer included is weekly. Edit both files to your taste.
+
+## Example command line usage
+
+### No arguments
 
     # snap-sync
 
-    Selected a mounted BTRFS device to backup to.
+    Select a mounted BTRFS device to backup to.
     1) 43cedfb6-8775-43be-8abc-ee63bb92e10e (/)
     2) 43cedfb6-8775-43be-8abc-ee63bb92e10e (/.snapshots)
     3) 43cedfb6-8775-43be-8abc-ee63bb92e10e (/home)
@@ -56,13 +74,14 @@ place. Example:
     0) Exit
     Enter a number: 4
     You selected the disk with UUID 7360922b-c916-4d9f-a670-67fe0b91143c.
+    The disk is mounted at /run/media/wes/backup.
     At 'home' configuration
     Backup location: /run/media/wes/backup/acer-c720/home/1097/
-    Continue (y/n)? y
+    Continue [Y/n]? y
     At subvol /home/.snapshots/1097/snapshot
     At 'root' configuration
     Backup location: /run/media/wes/backup/acer-c720/root/2288/
-    Continue (y/n)? y
+    Continue [Y/n]? y
     At subvol //.snapshots/2288/snapshot
     Done!
 
@@ -77,3 +96,17 @@ and for `root`:
 As you can see the userdata column for snapper is used to keep track of these
 snapshots for the next time the script is run so that only the changes will need
 to be sent.
+
+### With UUID specified and on confirmations
+
+    # snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --noconfirm
+
+    You selected the disk with UUID 7360922b-c916-4d9f-a670-67fe0b91143c.
+    The disk is mounted at /run/media/wes/backup.
+    At 'home' configuration
+    Backup location: /run/media/wes/backup/acer-c720/home/1373/
+    At subvol /home/.snapshots/1373/snapshot
+    At 'root' configuration
+    Backup location: /run/media/wes/backup/acer-c720/root/2777/
+    At subvol //.snapshots/2777/snapshot
+    Done!
