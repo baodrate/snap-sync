@@ -113,7 +113,7 @@ fi
 
 selected_uuid="${UUIDS_ARRAY[$((disk))]}"
 selected_mnt="${TARGETS_ARRAY[$((disk))]}"
-printf "You selected the disk with UUID %s.\n" "$selected_uuid"
+printf "\nYou selected the disk with UUID %s.\n" "$selected_uuid"
 printf "The disk is mounted at %s.\n" "$selected_mnt"
 
 if [[ -f /etc/conf.d/snapper ]]; then
@@ -127,14 +127,14 @@ selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
 
 for x in $selected_configs; do
 
+    printf "\n"
+
     if [[ -f "/etc/snapper/configs/$x" ]]; then
         source /etc/snapper/configs/$x
     else
         printf "Error: Selected snapper configuration $x does not exist."
         exit 1
     fi
-
-    printf "At '%s' configuration\n" "$x"
 
     old_number=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
     old_snapshot=$SUBVOLUME/.snapshots/$old_number/snapshot
@@ -159,16 +159,17 @@ for x in $selected_configs; do
     new_info=$SUBVOLUME/.snapshots/$new_number/info.xml
     sync
     backup_location=$BACKUPDIR/$x/$new_number/
-    printf "Backup location: %s\n" "$backup_location"
+    printf "Will backup %s to %s\n" "$new_snapshot" "$backup_location/snapshot"
 
     if [[ $noconfirm == "yes" ]]; then
         cont_backup="yes"
     else
-        read -r -p "Continue [Y/n]? " cont_backup
+        read -r -p "Continue with backup [Y/n]? " cont_backup
     fi
 
     if [[ "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] ]]; then
-        printf "Skipping this configuration.\n"
+        printf "Aborting backup for this configuration.\n"
+        snapper -c $x delete $new_number
         continue
     fi
 
