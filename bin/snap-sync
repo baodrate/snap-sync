@@ -132,7 +132,7 @@ for x in $selected_configs; do
     if [[ -f "/etc/snapper/configs/$x" ]]; then
         source /etc/snapper/configs/$x
     else
-        printf "Error: Selected snapper configuration $x does not exist."
+        printf "Error: Selected snapper configuration $x does not exist.\n"
         exit 1
     fi
 
