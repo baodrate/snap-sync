@@ -167,7 +167,7 @@ for x in $selected_configs; do
         read -r -p "Continue with backup [Y/n]? " cont_backup
     fi
 
-    if [[ "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] ]]; then
+    if [[ "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] && -n "$cont_backup" ]]; then
         printf "Aborting backup for this configuration.\n"
         snapper -c $x delete $new_number
         continue
