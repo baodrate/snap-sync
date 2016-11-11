@@ -19,9 +19,10 @@ PKGNAME = snap-sync
 PREFIX ?= /usr
 
 BIN_DIR = $(DESTDIR)$(PREFIX)/bin
+SYSTEMD_DIR = $(DESTDIR)$(PREFIX)/lib/systemd/system
 
 .PHONY: install
 
 install:
 	@install -Dm755 bin/* -t $(BIN_DIR)/
-	@install -Dm755 systemd/* -t $(PREFIX)/lib/systemd/system/
+	@install -Dm755 systemd/* -t $(SYSTEMD_DIR)/
