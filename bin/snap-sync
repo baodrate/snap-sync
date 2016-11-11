@@ -100,9 +100,9 @@ if [[ "$disk" == -1 ]]; then
     printf "Select a mounted BTRFS device to backup to.\n"
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
         for x in "${!TARGETS_ARRAY[@]}"; do
-            printf "%s) %s (%s)\n" "$((x+1))" "${UUIDS_ARRAY[$x]}" "${TARGETS_ARRAY[$x]}"
+            printf "%4s) %s (%s)\n" "$((x+1))" "${UUIDS_ARRAY[$x]}" "${TARGETS_ARRAY[$x]}"
         done
-        printf "0) Exit\n"
+        printf "%4s) Exit\n" "0"
         read -r -p "Enter a number: " disk
     done
     if [[ $disk == 0 ]]; then
