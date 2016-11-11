@@ -188,9 +188,10 @@ for x in $selected_configs; do
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
         btrfs send "$new_snapshot" -c "$old_snapshot" | btrfs receive "$backup_location" &>/dev/null
-        cp "$new_info" "$backup_location"
         snapper -c "$x" delete "$old_number"
     fi
+
+    cp "$new_info" "$backup_location"
 
     userdata="backupdir=$mybackupdir, uuid=$selected_uuid"
 
