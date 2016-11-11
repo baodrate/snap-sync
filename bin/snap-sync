@@ -146,7 +146,7 @@ for x in $selected_configs; do
         BACKUPDIR="$selected_mnt/$mybackupdir"
         mkdir -p "$BACKUPDIR"
     else
-        mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'"$selected_uuid"'/ {print $5}' | awk -F "," '{print $1}' | awk -F"=" '{print $2}')
+        mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'"$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
         if [[ ! -d $BACKUPDIR ]]; then
             printf "ERROR: %s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid"
