@@ -95,7 +95,7 @@ fi
 
 if [[ "$disk" == -1 ]]; then
     if [[ "$disk_count" == 0 && "$uuid_cmdline" != "none" ]]; then
-        printf "A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device.\n"
+        printf "ERROR: A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device.\n"
     fi
     printf "Select a mounted BTRFS device to backup to.\n"
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
