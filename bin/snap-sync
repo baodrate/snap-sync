@@ -144,7 +144,7 @@ for x in $selected_configs; do
         read -r -p "Enter name of directory to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
         printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
         BACKUPDIR="$selected_mnt/$mybackupdir"
-        mkdir -p "$BACKUPDIR"
+        mkdir -p -m700 "$BACKUPDIR"
     else
         mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'"$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
