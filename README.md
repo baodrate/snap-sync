@@ -99,3 +99,7 @@ to be sent.
 
     Done!
 
+## Contributing
+
+Help wanted! Feel free to fork and issue a pull request to add features or
+tackle an open issue.
