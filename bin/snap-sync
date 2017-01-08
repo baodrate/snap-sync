@@ -154,7 +154,7 @@ for x in $selected_configs; do
         fi
     fi
 
-    new_number=$(snapper -c "$x" create --print-number)
+    new_number=$(snapper -c "$x" create --print-number -d "snap-sync backup in progress")
     new_snapshot=$SUBVOLUME/.snapshots/$new_number/snapshot
     new_info=$SUBVOLUME/.snapshots/$new_number/info.xml
     sync
