@@ -135,11 +135,17 @@ selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
 # Initial configuration of where backup directories are
 for x in $selected_configs; do
 
+    SNAP_SYNC_EXCLUDE=no
+
     if [[ -f "/etc/snapper/configs/$x" ]]; then
         source /etc/snapper/configs/$x
     else
         printf "ERROR: Selected snapper configuration $x does not exist.\n"
         exit 1
+    fi
+
+    if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
+        continue
     fi
 
     old_num=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
@@ -166,7 +172,7 @@ done
 # Actual backing up
 for x in $selected_configs; do
 
-    printf "\n"
+    SNAP_SYNC_EXCLUDE=no
 
     if [[ -f "/etc/snapper/configs/$x" ]]; then
         source /etc/snapper/configs/$x
@@ -174,6 +180,12 @@ for x in $selected_configs; do
         printf "ERROR: Selected snapper configuration $x does not exist.\n"
         exit 1
     fi
+
+    if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
+        continue
+    fi
+
+    printf "\n"
 
     old_num=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
     old_snap=$SUBVOLUME/.snapshots/$old_num/snapshot

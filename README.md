@@ -46,6 +46,9 @@ place. Example:
 
 The timer included is weekly. Edit both files to your taste.
 
+You can exclude a configuration from backup by setting `SNAP_SYNC_EXCLUDE=yes`
+in your snapper configuration file.
+
 ## Example command line usage
 
 ### No arguments
