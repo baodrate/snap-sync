@@ -7,7 +7,7 @@
 # snapshot created on your system since that will be used to determine the
 # difference for the next incremental snapshot.
 
-version="0.2"
+version="0.2.3"
 
 set -e
 
