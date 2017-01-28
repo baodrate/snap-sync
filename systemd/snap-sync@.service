@@ -7,6 +7,4 @@ WantedBy=multi-user.target
 [Service]
 Type=simple
 
-ExecStart=/usr/bin/snap-sync \
-          --UUID %i \
-          --noconfirm
+ExecStart=/usr/bin/snap-sync-wrapper $i
