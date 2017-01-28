@@ -75,6 +75,7 @@ UUIDS="$(findmnt -n -v -t btrfs -o UUID --list)"
 
 declare -a TARGETS_ARRAY
 declare -a UUIDS_ARRAY
+declare -a BACKUPDIRS_ARRAY
 
 i=0
 disk=-1
@@ -131,9 +132,8 @@ fi
 
 selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
 
+# Initial configuration of where backup directories are
 for x in $selected_configs; do
-
-    printf "\n"
 
     if [[ -f "/etc/snapper/configs/$x" ]]; then
         source /etc/snapper/configs/$x
@@ -142,10 +142,10 @@ for x in $selected_configs; do
         exit 1
     fi
 
-    old_number=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
-    old_snapshot=$SUBVOLUME/.snapshots/$old_number/snapshot
+    old_num=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
+    old_snap=$SUBVOLUME/.snapshots/$old_num/snapshot
 
-    if [[ -z "$old_number" ]]; then
+    if [[ -z "$old_num" ]]; then
         printf "No backups have been performed for '%s' on this disk.\n" "$x"
         read -r -p "Enter name of directory to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
         printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
@@ -159,6 +159,26 @@ for x in $selected_configs; do
             exit 1
         fi
     fi
+    BACKUPDIRS_ARRAY[$x]=$BACKUPDIR
+
+done
+
+# Actual backing up
+for x in $selected_configs; do
+
+    printf "\n"
+
+    if [[ -f "/etc/snapper/configs/$x" ]]; then
+        source /etc/snapper/configs/$x
+    else
+        printf "ERROR: Selected snapper configuration $x does not exist.\n"
+        exit 1
+    fi
+
+    old_num=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
+    old_snap=$SUBVOLUME/.snapshots/$old_num/snapshot
+
+    BACKUPDIR="${BACKUPDIRS_ARRAY[$x]}"
 
     printf "Creating new snapshot for $x...\n" | tee $PIPE
     new_number=$(snapper -c "$x" create --print-number -d "snap-sync backup in progress")
@@ -190,7 +210,7 @@ for x in $selected_configs; do
     mkdir -p "$backup_location"
 
 
-    if [[ -z "$old_number" ]]; then
+    if [[ -z "$old_num" ]]; then
         printf "Sending first snapshot for %s...\n" "$x" | tee $PIPE  
         btrfs send "$new_snapshot" | btrfs receive "$backup_location" &>/dev/null
 
@@ -201,9 +221,9 @@ for x in $selected_configs; do
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
-        btrfs send "$new_snapshot" -c "$old_snapshot" | btrfs receive "$backup_location" &>/dev/null
+        btrfs send "$new_snapshot" -c "$old_snap" | btrfs receive "$backup_location" &>/dev/null
         printf "Deleting old snapshot for $x...\n" | tee $PIPE
-        snapper -c "$x" delete "$old_number"
+        snapper -c "$x" delete "$old_num"
     fi
 
     cp "$new_info" "$backup_location"
