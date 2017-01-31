@@ -11,6 +11,15 @@ version="0.3"
 
 set -e
 
+function error_exit 
+{
+    for u in $(users); do
+        notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
+        $notify_cmd 'Error in snap-sync backups. Check journal for more information.' --icon=dialog-error
+    done
+    exit 1
+}
+
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
@@ -55,6 +64,15 @@ done
 description=${description:-"latest incremental backup"}
 uuid_cmdline=${uuid_cmdline:-"none"}
 noconfirm=${noconfirm:-"no"}
+
+for u in $(users); do
+    notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
+    if [[ "$uuid_cmdline" != "none" ]]; then
+        $notify_cmd 'Starting snap-sync backups to '$uuid_cmdline'...' --icon=dialog-information
+    else
+        $notify_cmd 'Starting snap-sync backups. Use command line menu to select disk.'  --icon=dialog-information
+    fi
+done
 
 if [[ $EUID -ne 0 ]]; then
     printf "Script must be run as root.\n" 
@@ -121,7 +139,7 @@ if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
 else
     printf "ERROR: /etc/conf.d/snapper does not exist!\n"
-    exit 1
+    error_exit
 fi
 
 selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
@@ -135,7 +153,7 @@ for x in $selected_configs; do
         source /etc/snapper/configs/$x
     else
         printf "ERROR: Selected snapper configuration $x does not exist.\n"
-        exit 1
+        error_exit
     fi
 
     if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
@@ -156,7 +174,7 @@ for x in $selected_configs; do
         BACKUPDIR="$selected_mnt/$mybackupdir"
         if [[ ! -d $BACKUPDIR ]]; then
             printf "ERROR: %s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid"
-            exit 1
+            error_exit
         fi
     fi
     BACKUPDIRS_ARRAY[$x]=$BACKUPDIR
@@ -176,7 +194,7 @@ for x in $selected_configs; do
         source /etc/snapper/configs/$x
     else
         printf "ERROR: Selected snapper configuration $x does not exist.\n"
-        exit 1
+        error_exit
     fi
 
     if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
@@ -250,3 +268,12 @@ done
 
 printf "\nDone!\n"
 exec 3>&-
+
+for u in $(users); do
+    notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
+    if [[ "$uuid_cmdline" != "none" ]]; then
+        $notify_cmd 'snap-sync backups to '$1' complete!' --icon=dialog-information
+    else
+        $notify_cmd 'snap-sync backups complete!' --icon=dialog-information
+    fi
+done
