@@ -5,7 +5,7 @@
 for u in $(users); do
 
     notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
-     $notify_cmd 'Starting snap-sync backups to '$1'...' --icon=dialog-information
+    $notify_cmd 'Starting snap-sync backups to '$1'...' --icon=dialog-information
 
     /usr/bin/snap-sync --UUID $1 --noconfirm
     if [[ $? == 0 ]]; then
