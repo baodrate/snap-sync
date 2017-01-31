@@ -276,7 +276,7 @@ exec 3>&-
 for u in $(users); do
     notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
     if [[ "$uuid_cmdline" != "none" ]]; then
-        $notify_cmd -a 'snap-sync' 'Finished' 'Backups to '$1' complete!' --icon=dialog-information
+        $notify_cmd -a 'snap-sync' 'Finished' 'Backups to '$uuid_cmdline' complete!' --icon=dialog-information
     else
         $notify_cmd -a 'snap-sync' 'Finished' 'Backups complete!' --icon=dialog-information
     fi
