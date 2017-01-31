@@ -115,6 +115,10 @@ fi
 if [[ "$disk" == -1 ]]; then
     if [[ "$disk_count" == 0 && "$uuid_cmdline" != "none" ]]; then
         printf "ERROR: A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device.\n"
+        for u in $(users); do
+            notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
+            $notify_cmd -a snap-sync 'Error' 'No disk with '$uuid_cmdline' mounted.' --icon=dialog-error
+        done
     fi
     printf "Select a mounted BTRFS device to backup to.\n"
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
