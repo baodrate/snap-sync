@@ -1,5 +1,5 @@
 [Unit]
-Description=Run snap-sync weekly
+Description=Run snap-sync weekly (UUID %i)
 
 [Timer]
 OnCalendar=weekly
