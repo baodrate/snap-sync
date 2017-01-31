@@ -15,7 +15,7 @@ function error_exit
 {
     for u in $(users); do
         notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
-        $notify_cmd 'snap-sync error' 'Check journal for more information.' --icon=dialog-error
+        $notify_cmd -a snap-sync 'Error' 'Check journal for more information.' --icon=dialog-error
     done
     exit 1
 }
@@ -68,9 +68,9 @@ noconfirm=${noconfirm:-"no"}
 for u in $(users); do
     notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
     if [[ "$uuid_cmdline" != "none" ]]; then
-        $notify_cmd 'snap-sync' 'Starting backups to '$uuid_cmdline'...' --icon=dialog-information
+        $notify_cmd -a snap-sync 'Backup started' 'Starting backups to '$uuid_cmdline'...' --icon=dialog-information
     else
-        $notify_cmd 'snap-sync' 'Starting backups. Use command line menu to select disk.'  --icon=dialog-information
+        $notify_cmd -a snap-sync 'Backup started' 'Starting backups. Use command line menu to select disk.'  --icon=dialog-information
     fi
 done
 
@@ -272,8 +272,8 @@ exec 3>&-
 for u in $(users); do
     notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
     if [[ "$uuid_cmdline" != "none" ]]; then
-        $notify_cmd 'snap-sync' 'Backups to '$1' complete!' --icon=dialog-information
+        $notify_cmd -a 'snap-sync' 'Finished' 'Backups to '$1' complete!' --icon=dialog-information
     else
-        $notify_cmd 'snap-sync' 'Backups complete!' --icon=dialog-information
+        $notify_cmd -a 'snap-sync' 'Finished' 'Backups complete!' --icon=dialog-information
     fi
 done
