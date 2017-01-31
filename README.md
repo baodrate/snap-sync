@@ -20,7 +20,6 @@ have to be sent.
 
 snapper is required.
 
-
 ## Options
 
 	Usage: snap-sync [options]
@@ -35,6 +34,13 @@ snapper is required.
 	 -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
 							  If multiple mount points are found with the same UUID, will prompt user.
 
+## First run
+
+When you run `snap-sync` you will be prompted to choose a disk to back up to.
+The first time you run `snap-sync` for a particular disk (new UUID) you will be
+prompted to choose a backup location on that disk. If the directory you specify
+does not exist, it will be created.
+
 ## Systemd unit and timer
 
 A systemd unit and timer are included. These are instantiated units. You need to
@@ -47,7 +53,9 @@ place. Example:
 The timer included is weekly. Edit both files to your taste.
 
 You can exclude a configuration from backup by setting `SNAP_SYNC_EXCLUDE=yes`
-in your snapper configuration file.
+in your snapper configuration file. Additionally you should run snap-sync at
+least once for a new disk without using the service so you can be prompted for
+the backup location.
 
 ## Example command line usage
 
@@ -89,6 +97,8 @@ snapshots for the next time the script is run so that only the changes will need
 to be sent.
 
 ### With UUID specified and no confirmations
+
+This is essentially what the systemd service does.
 
     # snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --noconfirm
     You selected the disk with UUID 7360922b-c916-4d9f-a670-67fe0b91143c.
