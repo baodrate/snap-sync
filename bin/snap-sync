@@ -8,6 +8,7 @@
 # difference for the next incremental snapshot.
 
 version="0.3"
+name="snap-sync"
 
 set -e
 
@@ -15,7 +16,7 @@ function error_exit
 {
     for u in $(users); do
         notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
-        $notify_cmd -a snap-sync 'Error' 'Check journal for more information.' --icon=dialog-error
+        $notify_cmd -a $name 'Error' 'Check journal for more information.' --icon=dialog-error
     done
     exit 1
 }
@@ -40,8 +41,8 @@ while [[ $# -gt 0 ]]; do
             shift
         ;;
         -h|--help)
-            printf "snap-sync $version\n\n"
-            printf "Usage: snap-sync [options]\n\n"
+            printf "$name $version\n\n"
+            printf "Usage: $name [options]\n\n"
             printf "Options:\n"
             printf " -d, --description <desc> Change the snapper description. Default: \"latest incremental backup\"\n"
             printf " -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper\n"
@@ -55,7 +56,7 @@ while [[ $# -gt 0 ]]; do
         ;;
         *)
             printf "ERROR: Unknown option: $key\n"
-            printf "Run 'snap-sync -h' for valid options.\n"
+            printf "Run '$name -h' for valid options.\n"
             exit 1
         ;;
     esac
@@ -68,9 +69,9 @@ noconfirm=${noconfirm:-"no"}
 for u in $(users); do
     notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
     if [[ "$uuid_cmdline" != "none" ]]; then
-        $notify_cmd -a snap-sync 'Backup started' 'Starting backups to '$uuid_cmdline'...' --icon=dialog-information
+        $notify_cmd -a $name 'Backup started' 'Starting backups to '$uuid_cmdline'...' --icon=dialog-information
     else
-        $notify_cmd -a snap-sync 'Backup started' 'Starting backups. Use command line menu to select disk.'  --icon=dialog-information
+        $notify_cmd -a $name 'Backup started' 'Starting backups. Use command line menu to select disk.'  --icon=dialog-information
     fi
 done
 
@@ -79,13 +80,10 @@ if [[ $EUID -ne 0 ]]; then
     exit
 fi
 
-# It's important not to change this userdata in the snapshots, since that's how
-# we find the previous one.
-
 TMPDIR=$(mktemp -d)
-PIPE=$TMPDIR/snap-sync.out
+PIPE=$TMPDIR/$name.out
 mkfifo $PIPE
-systemd-cat -t "snap-sync" < $PIPE &
+systemd-cat -t "$name" < $PIPE &
 exec 3>$PIPE
 
 TARGETS="$(findmnt -n -v -t btrfs -o TARGET --list)"
@@ -123,7 +121,7 @@ if [[ "$disk" == -1 ]]; then
         printf "ERROR: A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device.\n"
         for u in $(users); do
             notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
-            $notify_cmd -a snap-sync 'Error' 'No disk with '$uuid_cmdline' mounted.' --icon=dialog-error
+            $notify_cmd -a $name 'Error' 'No disk with '$uuid_cmdline' mounted.' --icon=dialog-error
         done
     fi
     printf "Select a mounted BTRFS device to backup to.\n"
@@ -194,8 +192,8 @@ done
 # Actual backing up
 for x in $selected_configs; do
 
-    if [[ "$(sudo snapper -c root list -t single | awk '/snap-sync backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
-        printf "Note: Previous failed snap-sync backup snapshots found for '$x'.\n" | tee $PIPE
+    if [[ "$(sudo snapper -c root list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
+        printf "Note: Previous failed $name backup snapshots found for '$x'.\n" | tee $PIPE
     fi
 
     SNAP_SYNC_EXCLUDE=no
@@ -219,7 +217,7 @@ for x in $selected_configs; do
     BACKUPDIR="${BACKUPDIRS_ARRAY[$x]}"
 
     printf "Creating new snapshot for $x...\n" | tee $PIPE
-    new_number=$(snapper -c "$x" create --print-number -d "snap-sync backup in progress")
+    new_number=$(snapper -c "$x" create --print-number -d "$name backup in progress")
     new_snapshot=$SUBVOLUME/.snapshots/$new_number/snapshot
     new_info=$SUBVOLUME/.snapshots/$new_number/info.xml
     sync
@@ -266,6 +264,9 @@ for x in $selected_configs; do
 
     cp "$new_info" "$backup_location"
 
+    # It's important not to change this userdata in the snapshots, since that's how
+    # we find the previous one.
+
     userdata="backupdir=$mybackupdir, uuid=$selected_uuid"
 
     # Tag new snapshot as the latest
@@ -282,8 +283,8 @@ exec 3>&-
 for u in $(users); do
     notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
     if [[ "$uuid_cmdline" != "none" ]]; then
-        $notify_cmd -a 'snap-sync' 'Finished' 'Backups to '$uuid_cmdline' complete!' --icon=dialog-information
+        $notify_cmd -a $name 'Finished' 'Backups to '$uuid_cmdline' complete!' --icon=dialog-information
     else
-        $notify_cmd -a 'snap-sync' 'Finished' 'Backups complete!' --icon=dialog-information
+        $notify_cmd -a $name 'Finished' 'Backups complete!' --icon=dialog-information
     fi
 done
