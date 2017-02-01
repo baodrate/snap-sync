@@ -224,13 +224,17 @@ for x in $selected_configs; do
     backup_location=$BACKUPDIR/$x/$new_number/
     printf "Will backup %s to %s\n" "$new_snapshot" "$backup_location/snapshot" | tee $PIPE
 
-    cont_backup=""
+    cont_backup="K"
     if [[ $noconfirm == "yes" ]]; then
         cont_backup="yes"
     else
-        while [[ $cont_backup != [Yy]"es" && $cont_backup != [Yy] && $cont_backup != [Nn]"o" && $cont_backup != [Nn] ]]; do
+        while [[ -n "$cont_backup" && "$cont_backup" != [Yy]"es" &&
+            "$cont_backup" != [Yy] && "$cont_backup" != [Nn]"o" &&
+            "$cont_backup" != [Nn] ]]; do
             read -r -p "Continue with backup [Y/n]? " cont_backup
-            if [[ $cont_backup != [Yy]"es" && $cont_backup != [Yy] && $cont_backup != [Nn]"o" && $cont_backup != [Nn] ]]; then
+            if [[ -n "$cont_backup" && "$cont_backup" != [Yy]"es" &&
+            "$cont_backup" != [Yy] && "$cont_backup" != [Nn]"o" &&
+            "$cont_backup" != [Nn] ]]; then
                 printf "Select 'Y' or 'n'.\n"
             fi
         done
