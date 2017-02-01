@@ -192,8 +192,8 @@ done
 # Actual backing up
 for x in $selected_configs; do
 
-    if [[ "$(sudo snapper -c root list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
-        printf "Note: Previous failed $name backup snapshots found for '$x'.\n" | tee $PIPE
+    if [[ "$(sudo snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
+        printf "\nNOTE: Previous failed $name backup snapshots found for '$x'.\n" | tee $PIPE
     fi
 
     SNAP_SYNC_EXCLUDE=no
