@@ -99,7 +99,6 @@ UUIDS="$(findmnt -n -v -t btrfs -o UUID --list)"
 
 declare -a TARGETS_ARRAY
 declare -a UUIDS_ARRAY
-declare -a BACKUPDIRS_ARRAY
 
 i=0
 disk=-1
@@ -160,50 +159,19 @@ fi
 
 selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
 
+declare -a BACKUPDIRS_ARRAY
+declare -a MYBACKUPDIR_ARRAY
+declare -a OLD_NUM_ARRAY
+declare -a OLD_SNAP_ARRAY
+declare -a NEW_NUM_ARRAY
+declare -a NEW_SNAP_ARRAY
+declare -a NEW_INFO_ARRAY
+declare -a BACKUPLOC_ARRAY
+declare -a CONT_BACKUP_ARRAY
+
 # Initial configuration of where backup directories are
 i=0
 for x in $selected_configs; do
-
-    SNAP_SYNC_EXCLUDE=no
-
-    if [[ -f "/etc/snapper/configs/$x" ]]; then
-        source /etc/snapper/configs/$x
-    else
-        printf "ERROR: Selected snapper configuration $x does not exist.\n"
-        error_exit
-    fi
-
-    if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
-        continue
-    fi
-
-    old_num=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
-    old_snap=$SUBVOLUME/.snapshots/$old_num/snapshot
-
-    if [[ -z "$old_num" ]]; then
-        printf "No backups have been performed for '%s' on this disk.\n" "$x"
-        read -r -p "Enter name of directory to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
-        printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
-        BACKUPDIR="$selected_mnt/$mybackupdir"
-        mkdir -p -m700 "$BACKUPDIR"
-    else
-        mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'"$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
-        BACKUPDIR="$selected_mnt/$mybackupdir"
-        if [[ ! -d $BACKUPDIR ]]; then
-            printf "ERROR: %s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid" | tee $PIPE
-            error_exit
-        fi
-    fi
-    BACKUPDIRS_ARRAY[$i]=$BACKUPDIR
-    i=$(($i+1))
-
-done
-
-# Actual backing up
-i=-1
-for x in $selected_configs; do
-
-    i=$(($i+1))
 
     if [[ "$(sudo snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
         printf "\nNOTE: Previous failed $name backup snapshots found for '$x'.\n" | tee $PIPE
@@ -222,22 +190,45 @@ for x in $selected_configs; do
         continue
     fi
 
-    printf "\n"
-
     old_num=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
     old_snap=$SUBVOLUME/.snapshots/$old_num/snapshot
 
-    BACKUPDIR="${BACKUPDIRS_ARRAY[$i]}"
+    OLD_NUM_ARRAY[$i]=$old_num
+    OLD_SNAP_ARRAY[$i]=$old_snap
+
+    if [[ -z "$old_num" ]]; then
+        printf "No backups have been performed for '%s' on this disk.\n" "$x"
+        read -r -p "Enter name of directory to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
+        printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
+        BACKUPDIR="$selected_mnt/$mybackupdir"
+        mkdir -p -m700 "$BACKUPDIR"
+    else
+        mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'"$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
+        BACKUPDIR="$selected_mnt/$mybackupdir"
+        if [[ ! -d $BACKUPDIR ]]; then
+            printf "ERROR: %s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid" | tee $PIPE
+            error_exit
+        fi
+    fi
+    BACKUPDIRS_ARRAY[$i]="$BACKUPDIR"
+    MYBACKUPDIR_ARRAY[$i]="$mybackupdir"
 
     printf "Creating new snapshot for $x...\n" | tee $PIPE
-    new_number=$(snapper -c "$x" create --print-number -d "$name backup in progress")
-    new_snapshot=$SUBVOLUME/.snapshots/$new_number/snapshot
-    new_info=$SUBVOLUME/.snapshots/$new_number/info.xml
+    new_num=$(snapper -c "$x" create --print-number -d "$name backup in progress")
+    new_snap=$SUBVOLUME/.snapshots/$new_num/snapshot
+    new_info=$SUBVOLUME/.snapshots/$new_num/info.xml
     sync
-    backup_location=$BACKUPDIR/$x/$new_number/
-    printf "Will backup %s to %s\n" "$new_snapshot" "$backup_location/snapshot" | tee $PIPE
+    backup_location=$BACKUPDIR/$x/$new_num/
+    printf "Will backup %s to %s\n" "$new_snap" "$backup_location/snapshot" | tee $PIPE
+
+    NEW_NUM_ARRAY[$i]="$new_num"
+    NEW_SNAP_ARRAY[$i]="$new_snap"
+    NEW_INFO_ARRAY[$i]="$new_info"
+    BACKUPLOC_ARRAY[$i]="$backup_location"
 
     cont_backup="K"
+    CONT_BACKUP_ARRAY[$i]="yes"
+    echo ${CONT_BACKUP_ARRAY[$x]}
     if [[ $noconfirm == "yes" ]]; then
         cont_backup="yes"
     else
@@ -254,18 +245,54 @@ for x in $selected_configs; do
     fi
 
     if [[ "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] && -n "$cont_backup" ]]; then
+        CONT_BACKUP_ARRAY[$i]="no"
         printf "Aborting backup for this configuration.\n"
-        snapper -c $x delete $new_number
+        snapper -c $x delete $new_num
+    fi
+    echo ${CONT_BACKUP_ARRAY[$i]}
+
+    i=$(($i+1))
+
+done
+
+# Actual backing up
+i=-1
+for x in $selected_configs; do
+
+    i=$(($i+1))
+
+    echo ${CONT_BACKUP_ARRAY[$i]}
+
+    SNAP_SYNC_EXCLUDE=no
+
+    if [[ -f "/etc/snapper/configs/$x" ]]; then
+        source /etc/snapper/configs/$x
+    else
+        printf "ERROR: Selected snapper configuration $x does not exist.\n"
+        error_exit
+    fi
+
+    cont_backup=${CONT_BACKUP_ARRAY[$i]}
+    if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
         continue
     fi
 
+    printf "\n"
+
+    old_num="${OLD_NUM_ARRAY[$i]}"
+    old_snap="${OLD_SNAP_ARRAY[$i]}"
+    BACKUPDIR="${BACKUPDIRS_ARRAY[$i]}"
+    mybackupdir="${MYBACKUPDIR_ARRAY[$i]}"
+    new_num="${NEW_NUM_ARRAY[$i]}"
+    new_snap="${NEW_SNAP_ARRAY[$i]}"
+    new_info="${NEW_INFO_ARRAY[$i]}"
+    backup_location="${BACKUPLOC_ARRAY[$i]}"
 
     mkdir -p "$backup_location"
 
-
     if [[ -z "$old_num" ]]; then
         printf "Sending first snapshot for %s...\n" "$x" | tee $PIPE  
-        btrfs send "$new_snapshot" | btrfs receive "$backup_location" &>/dev/null
+        btrfs send "$new_snap" | btrfs receive "$backup_location" &>/dev/null
 
     else
 
@@ -274,7 +301,7 @@ for x in $selected_configs; do
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
-        btrfs send "$new_snapshot" -c "$old_snap" | btrfs receive "$backup_location" &>/dev/null
+        btrfs send "$new_snap" -c "$old_snap" | btrfs receive "$backup_location" &>/dev/null
         printf "Deleting old snapshot for $x...\n" | tee $PIPE
         snapper -c "$x" delete "$old_num"
     fi
@@ -288,7 +315,7 @@ for x in $selected_configs; do
 
     # Tag new snapshot as the latest
     printf "Tagging new snapshot as latest backup for $x...\n" | tee $PIPE
-    snapper -v -c "$x" modify -d "$description" -u "$userdata" "$new_number"
+    snapper -v -c "$x" modify -d "$description" -u "$userdata" "$new_num"
 
     printf "Backup complete for configuration %s.\n" "$x" > $PIPE
 
