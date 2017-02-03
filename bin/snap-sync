@@ -275,7 +275,7 @@ for x in $selected_configs; do
 
     cont_backup=${CONT_BACKUP_ARRAY[$i]}
     if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
-        $notify_cmd -a $name 'Backup in progress' 'Skipping '$x' configuration.' --icon=dialog-information
+        $notify_cmd -a $name 'Backup in progress' 'NOTE: Skipping '$x' configuration.' --icon=dialog-information
         continue
     fi
 
