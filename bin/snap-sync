@@ -161,6 +161,7 @@ fi
 selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
 
 # Initial configuration of where backup directories are
+i=0
 for x in $selected_configs; do
 
     SNAP_SYNC_EXCLUDE=no
@@ -193,12 +194,16 @@ for x in $selected_configs; do
             error_exit
         fi
     fi
-    BACKUPDIRS_ARRAY[$x]=$BACKUPDIR
+    BACKUPDIRS_ARRAY[$i]=$BACKUPDIR
+    i=$(($i+1))
 
 done
 
 # Actual backing up
+i=-1
 for x in $selected_configs; do
+
+    i=$(($i+1))
 
     if [[ "$(sudo snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
         printf "\nNOTE: Previous failed $name backup snapshots found for '$x'.\n" | tee $PIPE
@@ -222,7 +227,7 @@ for x in $selected_configs; do
     old_num=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
     old_snap=$SUBVOLUME/.snapshots/$old_num/snapshot
 
-    BACKUPDIR="${BACKUPDIRS_ARRAY[$x]}"
+    BACKUPDIR="${BACKUPDIRS_ARRAY[$i]}"
 
     printf "Creating new snapshot for $x...\n" | tee $PIPE
     new_number=$(snapper -c "$x" create --print-number -d "$name backup in progress")
