@@ -169,7 +169,7 @@ declare -a NEW_INFO_ARRAY
 declare -a BACKUPLOC_ARRAY
 declare -a CONT_BACKUP_ARRAY
 
-printf "Initial configuration...\n" | tee $PIPE
+printf "\nInitial configuration...\n" | tee $PIPE
 
 # Initial configuration of where backup directories are
 i=0
@@ -191,6 +191,8 @@ for x in $selected_configs; do
     if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
         continue
     fi
+
+    printf "\n"
 
     old_num=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
     old_snap=$SUBVOLUME/.snapshots/$old_num/snapshot
