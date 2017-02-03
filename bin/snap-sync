@@ -169,6 +169,8 @@ declare -a NEW_INFO_ARRAY
 declare -a BACKUPLOC_ARRAY
 declare -a CONT_BACKUP_ARRAY
 
+printf "Initial configuration..." | tee $PIPE
+
 # Initial configuration of where backup directories are
 i=0
 for x in $selected_configs; do
@@ -228,7 +230,6 @@ for x in $selected_configs; do
 
     cont_backup="K"
     CONT_BACKUP_ARRAY[$i]="yes"
-    echo ${CONT_BACKUP_ARRAY[$x]}
     if [[ $noconfirm == "yes" ]]; then
         cont_backup="yes"
     else
@@ -249,19 +250,17 @@ for x in $selected_configs; do
         printf "Aborting backup for this configuration.\n"
         snapper -c $x delete $new_num
     fi
-    echo ${CONT_BACKUP_ARRAY[$i]}
 
     i=$(($i+1))
 
 done
 
 # Actual backing up
+printf "Performing backups..." | tee $PIPE
 i=-1
 for x in $selected_configs; do
 
     i=$(($i+1))
-
-    echo ${CONT_BACKUP_ARRAY[$i]}
 
     SNAP_SYNC_EXCLUDE=no
 
@@ -274,8 +273,11 @@ for x in $selected_configs; do
 
     cont_backup=${CONT_BACKUP_ARRAY[$i]}
     if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
+        $notify_cmd -a $name 'Backup in progress' 'Skipping '$x' configuration.' --icon=dialog-information
         continue
     fi
+
+    $notify_cmd -a $name 'Backup in progress' 'Backing up '$x' configuration.' --icon=dialog-information
 
     printf "\n"
 
