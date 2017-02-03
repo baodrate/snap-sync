@@ -10,16 +10,24 @@
 version="0.3"
 name="snap-sync"
 
-set -e
-
 function error_exit 
 {
     for u in $(users); do
         notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
         $notify_cmd -a $name 'Error' 'Check journal for more information.' --icon=dialog-error
     done
+    printf "\nExited due to error.\n" | tee $PIPE
     exit 1
 }
+
+function kill_exit 
+{
+    printf "\nExited due to user intervention.\n" | tee $PIPE
+    exit 1
+}
+
+trap error_exit ERR
+trap kill_exit SIGTERM SIGINT
 
 while [[ $# -gt 0 ]]; do
     key="$1"
