@@ -169,7 +169,7 @@ declare -a NEW_INFO_ARRAY
 declare -a BACKUPLOC_ARRAY
 declare -a CONT_BACKUP_ARRAY
 
-printf "Initial configuration..." | tee $PIPE
+printf "Initial configuration...\n" | tee $PIPE
 
 # Initial configuration of where backup directories are
 i=0
@@ -256,7 +256,7 @@ for x in $selected_configs; do
 done
 
 # Actual backing up
-printf "Performing backups..." | tee $PIPE
+printf "\nPerforming backups...\n" | tee $PIPE
 i=-1
 for x in $selected_configs; do
 
