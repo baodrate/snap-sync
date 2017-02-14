@@ -10,24 +10,68 @@
 version="0.3"
 name="snap-sync"
 
-function error_exit 
-{
+TMPDIR=$(mktemp -d)
+PIPE=$TMPDIR/$name.out
+mkfifo $PIPE
+systemd-cat -t "$name" < $PIPE &
+exec 3>$PIPE
+
+notify_info() {
     for u in $(users); do
-        notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
-        $notify_cmd -a $name 'Error' 'Check journal for more information.' --icon=dialog-error
+        sudo -u $u DISPLAY=:0 \
+        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
+        notify-send -a $name "$1" "$2" --icon=dialog-information
     done
-    printf "\nExited due to error.\n" | tee $PIPE
+}
+
+notify_error() {
+    for u in $(users); do
+        sudo -u $u DISPLAY=:0 \
+        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
+        notify-send -a $name "$1" "$2" --icon=dialog-error
+    done
+}
+
+out() { 
+    printf "$1 $2\n" "${@:3}" | tee $PIPE
+}
+
+error() { 
+    out "==> ERROR:" "$@"
+    notify_error 'Error' 'Check journal for more information.'
+} >&2
+
+die() { 
+    error "$@"
     exit 1
 }
 
-function kill_exit 
-{
-    printf "\nExited due to user intervention.\n" | tee $PIPE
-    exit 1
+sigkill() { 
+    die "Exited due to user intervention." 
 }
 
-trap error_exit ERR
-trap kill_exit SIGTERM SIGINT
+[[ $EUID -ne 0 ]] && die "Script must be run as root." 
+
+usage() {
+  cat <<EOF
+$name $version
+Usage: $name [options]
+
+Options:
+ -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
+ -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper
+                          configuration. Can list multiple configurations within quotes, space-separated
+                          (e.g. -c "root home").
+ -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
+                          directory name on first backup"
+ -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt."
+                          If multiple mount points are found with the same UUID, will prompt user."
+
+EOF
+}
+
+trap error ERR
+trap sigkill SIGTERM SIGINT
 
 while [[ $# -gt 0 ]]; do
     key="$1"
@@ -49,17 +93,7 @@ while [[ $# -gt 0 ]]; do
             shift
         ;;
         -h|--help)
-            printf "$name $version\n\n"
-            printf "Usage: $name [options]\n\n"
-            printf "Options:\n"
-            printf " -d, --description <desc> Change the snapper description. Default: \"latest incremental backup\"\n"
-            printf " -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper\n"
-            printf "                          configuration. Can list multiple configurations within quotes, space-separated\n"
-            printf "                          (e.g. -c \"root home\").\n"
-            printf " -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup\n"
-            printf "                          directory name on first backup\n"
-            printf " -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.\n"
-            printf "                          If multiple mount points are found with the same UUID, will prompt user.\n"
+            usage
             exit 1
         ;;
         *)
@@ -74,25 +108,11 @@ description=${description:-"latest incremental backup"}
 uuid_cmdline=${uuid_cmdline:-"none"}
 noconfirm=${noconfirm:-"no"}
 
-for u in $(users); do
-    notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
-    if [[ "$uuid_cmdline" != "none" ]]; then
-        $notify_cmd -a $name 'Backup started' 'Starting backups to '$uuid_cmdline'...' --icon=dialog-information
-    else
-        $notify_cmd -a $name 'Backup started' 'Starting backups. Use command line menu to select disk.'  --icon=dialog-information
-    fi
-done
-
-if [[ $EUID -ne 0 ]]; then
-    printf "Script must be run as root.\n" 
-    exit
+if [[ "$uuid_cmdline" != "none" ]]; then
+    notify_info "Backup started" "Starting backups to $uuid_cmdline..."
+else
+    notify_info "Backup started" "Starting backups. Use command line menu to select disk."
 fi
-
-TMPDIR=$(mktemp -d)
-PIPE=$TMPDIR/$name.out
-mkfifo $PIPE
-systemd-cat -t "$name" < $PIPE &
-exec 3>$PIPE
 
 TARGETS="$(findmnt -n -v -t btrfs -o TARGET --list)"
 UUIDS="$(findmnt -n -v -t btrfs -o UUID --list)"
@@ -125,11 +145,7 @@ fi
 
 if [[ "$disk" == -1 ]]; then
     if [[ "$disk_count" == 0 && "$uuid_cmdline" != "none" ]]; then
-        printf "ERROR: A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device.\n"
-        for u in $(users); do
-            notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
-            $notify_cmd -a $name 'Error' 'No disk with '$uuid_cmdline' mounted.' --icon=dialog-error
-        done
+        error "A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device."
     fi
     printf "Select a mounted BTRFS device to backup to.\n"
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
@@ -153,8 +169,7 @@ printf "The disk is mounted at %s.\n" "$selected_mnt" | tee $PIPE
 if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
 else
-    printf "ERROR: /etc/conf.d/snapper does not exist!\n" | tee $PIPE
-    error_exit
+    die "/etc/conf.d/snapper does not exist!"
 fi
 
 selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
@@ -184,8 +199,7 @@ for x in $selected_configs; do
     if [[ -f "/etc/snapper/configs/$x" ]]; then
         source /etc/snapper/configs/$x
     else
-        printf "ERROR: Selected snapper configuration $x does not exist.\n"
-        error_exit
+        die "Selected snapper configuration $x does not exist."
     fi
 
     if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
@@ -210,8 +224,7 @@ for x in $selected_configs; do
         mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'"$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
         if [[ ! -d $BACKUPDIR ]]; then
-            printf "ERROR: %s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid" | tee $PIPE
-            error_exit
+            die "%s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid"
         fi
     fi
     BACKUPDIRS_ARRAY[$i]="$BACKUPDIR"
@@ -275,11 +288,11 @@ for x in $selected_configs; do
 
     cont_backup=${CONT_BACKUP_ARRAY[$i]}
     if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
-        $notify_cmd -a $name 'Backup in progress' 'NOTE: Skipping '$x' configuration.' --icon=dialog-information
+        notify_info "Backup in progress" "NOTE: Skipping $x configuration."
         continue
     fi
 
-    $notify_cmd -a $name 'Backup in progress' 'Backing up '$x' configuration.' --icon=dialog-information
+    notify_info "Backup in progress" "Backing up $x configuration."
 
     printf "\n"
 
@@ -328,11 +341,8 @@ done
 printf "\nDone!\n" | tee $PIPE
 exec 3>&-
 
-for u in $(users); do
-    notify_cmd="sudo -u $u DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus notify-send"
-    if [[ "$uuid_cmdline" != "none" ]]; then
-        $notify_cmd -a $name 'Finished' 'Backups to '$uuid_cmdline' complete!' --icon=dialog-information
-    else
-        $notify_cmd -a $name 'Finished' 'Backups complete!' --icon=dialog-information
-    fi
-done
+if [[ "$uuid_cmdline" != "none" ]]; then
+    notify_info "Finished" "Backups to $uuid_cmdline complete!"
+else
+    notify_info "Finished" "Backups complete!"
+fi
