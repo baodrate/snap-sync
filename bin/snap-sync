@@ -97,9 +97,7 @@ while [[ $# -gt 0 ]]; do
             exit 1
         ;;
         *)
-            printf "ERROR: Unknown option: $key\n"
-            printf "Run '$name -h' for valid options.\n"
-            exit 1
+            die "Unknown option: $key\nRun '$name -h' for valid options.\n"
         ;;
     esac
 done
@@ -281,9 +279,7 @@ for x in $selected_configs; do
 
     if [[ -f "/etc/snapper/configs/$x" ]]; then
         source /etc/snapper/configs/$x
-    else
-        printf "ERROR: Selected snapper configuration $x does not exist.\n"
-        error_exit
+        die "Selected snapper configuration $x does not exist."
     fi
 
     cont_backup=${CONT_BACKUP_ARRAY[$i]}
