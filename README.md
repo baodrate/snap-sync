@@ -33,6 +33,9 @@ snapper is required.
 							  directory name on first backup
 	 -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
 							  If multiple mount points are found with the same UUID, will prompt user.
+     --remote <address>       Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
+                              should specify the remote machine's hostname or ip address. The 'root' user must be
+                              permitted to login on the remote machine.
 
 ## First run
 
