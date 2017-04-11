@@ -22,17 +22,17 @@ snapper is required.
 
 ## Options
 
-	Usage: snap-sync [options]
+    Usage: snap-sync [options]
 
-	Options:
-	 -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
-	 -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper
-							  configuration. Can list multiple configurations within quotes, space-separated
-							  (e.g. -c "root home").
-	 -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
-							  directory name on first backup
-	 -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
-							  If multiple mount points are found with the same UUID, will prompt user.
+    Options:
+     -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
+     -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper
+                              configuration. Can list multiple configurations within quotes, space-separated
+                              (e.g. -c "root home").
+     -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
+                              directory name on first backup
+     -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
+                              If multiple mount points are found with the same UUID, will prompt user.
      --remote <address>       Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
                               should specify the remote machine's hostname or ip address. The 'root' user must be
                               permitted to login on the remote machine.
