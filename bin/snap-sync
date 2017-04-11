@@ -66,12 +66,15 @@ Options:
                           directory name on first backup"
  -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt."
                           If multiple mount points are found with the same UUID, will prompt user."
+ --remote <address>       The destination for the snapshot if it is not on the local machine. The snapshot will 
+                          be sent via ssh. You should specify the remote machine's hostname or ip address. 
 
 EOF
 }
 
 trap error ERR
 trap sigkill SIGTERM SIGINT
+ssh=""
 
 while [[ $# -gt 0 ]]; do
     key="$1"
@@ -96,6 +99,11 @@ while [[ $# -gt 0 ]]; do
             usage
             exit 1
         ;;
+	    --remote)
+            remote=$2
+            ssh="ssh $remote"
+            shift 2
+	    ;;
         *)
             die "Unknown option: $key\nRun '$name -h' for valid options.\n"
         ;;
@@ -107,13 +115,21 @@ uuid_cmdline=${uuid_cmdline:-"none"}
 noconfirm=${noconfirm:-"no"}
 
 if [[ "$uuid_cmdline" != "none" ]]; then
-    notify_info "Backup started" "Starting backups to $uuid_cmdline..."
+    if [[ -z $ssh ]]; then
+        notify_info "Backup started" "Starting backups to $uuid_cmdline..."
+    else
+        notify_info "Backup started" "Starting backups to $uuid_cmdline at $remote..."
+    fi
 else
-    notify_info "Backup started" "Starting backups. Use command line menu to select disk."
+    if [[ -z $ssh ]]; then
+        notify_info "Backup started" "Starting backups. Use command line menu to select disk."
+    else
+        notify_info "Backup started" "Starting backups. Use command line menu to select disk on $remote."
+    fi
 fi
 
-TARGETS="$(findmnt -n -v -t btrfs -o TARGET --list)"
-UUIDS="$(findmnt -n -v -t btrfs -o UUID --list)"
+TARGETS="$($ssh findmnt -n -v -t btrfs -o TARGET --list)"
+UUIDS="$($ssh findmnt -n -v -t btrfs -o UUID --list)"
 
 declare -a TARGETS_ARRAY
 declare -a UUIDS_ARRAY
@@ -162,7 +178,11 @@ fi
 selected_uuid="${UUIDS_ARRAY[$((disk))]}"
 selected_mnt="${TARGETS_ARRAY[$((disk))]}"
 printf "\nYou selected the disk with UUID %s.\n" "$selected_uuid" | tee $PIPE
-printf "The disk is mounted at %s.\n" "$selected_mnt" | tee $PIPE
+if [[ -z $ssh ]]; then
+    printf "The disk is mounted at %s.\n" "$selected_mnt" | tee $PIPE
+else
+    printf "The disk is mounted at %s:%s.\n" "$remote" "$selected_mnt" | tee $PIPE
+fi
 
 if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
@@ -188,7 +208,7 @@ printf "\nInitial configuration...\n" | tee $PIPE
 i=0
 for x in $selected_configs; do
 
-    if [[ "$(sudo snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
+    if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
         printf "\nNOTE: Previous failed $name backup snapshots found for '$x'.\n" | tee $PIPE
     fi
 
@@ -217,13 +237,11 @@ for x in $selected_configs; do
         read -r -p "Enter name of directory to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
         printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
         BACKUPDIR="$selected_mnt/$mybackupdir"
-        mkdir -p -m700 "$BACKUPDIR"
+        $mkdir -p -m700 "$BACKUPDIR"
     else
         mybackupdir=$(snapper -c root list -t single | awk -F"|" '/'"$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
-        if [[ ! -d $BACKUPDIR ]]; then
-            die "%s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid"
-        fi
+        $ssh test -d $BACKUPDIR || die "%s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid"
     fi
     BACKUPDIRS_ARRAY[$i]="$BACKUPDIR"
     MYBACKUPDIR_ARRAY[$i]="$mybackupdir"
@@ -234,7 +252,11 @@ for x in $selected_configs; do
     new_info=$SUBVOLUME/.snapshots/$new_num/info.xml
     sync
     backup_location=$BACKUPDIR/$x/$new_num/
-    printf "Will backup %s to %s\n" "$new_snap" "$backup_location/snapshot" | tee $PIPE
+    if [[ -z $ssh ]]; then
+        printf "Will backup %s to %s\n" "$new_snap" "$backup_location/snapshot" | tee $PIPE
+    else
+        printf "Will backup %s to %s\n" "$new_snap" "$remote":"$backup_location/snapshot" | tee $PIPE
+    fi
 
     NEW_NUM_ARRAY[$i]="$new_num"
     NEW_SNAP_ARRAY[$i]="$new_snap"
@@ -279,6 +301,7 @@ for x in $selected_configs; do
 
     if [[ -f "/etc/snapper/configs/$x" ]]; then
         source /etc/snapper/configs/$x
+    else
         die "Selected snapper configuration $x does not exist."
     fi
 
@@ -301,11 +324,11 @@ for x in $selected_configs; do
     new_info="${NEW_INFO_ARRAY[$i]}"
     backup_location="${BACKUPLOC_ARRAY[$i]}"
 
-    mkdir -p "$backup_location"
+    $ssh mkdir -p $backup_location
 
     if [[ -z "$old_num" ]]; then
         printf "Sending first snapshot for %s...\n" "$x" | tee $PIPE  
-        btrfs send "$new_snap" | btrfs receive "$backup_location" &>/dev/null
+        btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &>/dev/null
 
     else
 
@@ -314,12 +337,16 @@ for x in $selected_configs; do
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
-        btrfs send "$new_snap" -c "$old_snap" | btrfs receive "$backup_location" &>/dev/null
+        btrfs send "$new_snap" -c "$old_snap" | $ssh btrfs receive "$backup_location"
         printf "Deleting old snapshot for $x...\n" | tee $PIPE
         snapper -c "$x" delete "$old_num"
     fi
 
-    cp "$new_info" "$backup_location"
+    if [[ -z $ssh ]]; then
+        cp "$new_info" "$backup_location"
+    else
+        rsync -avzq "$new_info" "$remote":"$backup_location"
+    fi
 
     # It's important not to change this userdata in the snapshots, since that's how
     # we find the previous one.
