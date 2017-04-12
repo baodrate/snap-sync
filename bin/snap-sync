@@ -162,7 +162,11 @@ if [[ "$disk" == -1 ]]; then
     if [[ "$disk_count" == 0 && "$uuid_cmdline" != "none" ]]; then
         error "A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device."
     fi
-    printf "Select a mounted BTRFS device to backup to.\n"
+    if [[ -z $ssh ]]; then
+        printf "Select a mounted BTRFS device on your local machine to backup to.\n"
+    else
+        printf "Select a mounted BTRFS device on $remote to backup to.\n"
+    fi
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
         for x in "${!TARGETS_ARRAY[@]}"; do
             printf "%4s) %s (%s)\n" "$((x+1))" "${UUIDS_ARRAY[$x]}" "${TARGETS_ARRAY[$x]}"
