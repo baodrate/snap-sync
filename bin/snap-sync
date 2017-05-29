@@ -173,6 +173,10 @@ if [[ "$disk" == -1 ]]; then
         done
         printf "%4s) Exit\n" "0"
         read -r -p "Enter a number: " disk
+        if ! [[ $disk == ?(-)+([0-9]) ]]; then
+            printf "\nNo disk selected. Select a disk to continue.\n"
+            disk=-1
+        fi
     done
     if [[ $disk == 0 ]]; then
         exit 0
