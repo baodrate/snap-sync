@@ -342,7 +342,7 @@ for x in $selected_configs; do
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
-        btrfs send "$new_snap" -c "$old_snap" | $ssh btrfs receive "$backup_location"
+        btrfs send -c "$old_snap" "$new_snap" | $ssh btrfs receive "$backup_location"
         printf "Deleting old snapshot for $x...\n" | tee $PIPE
         snapper -c "$x" delete "$old_num"
     fi
