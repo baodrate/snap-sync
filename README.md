@@ -1,4 +1,4 @@
-# snap-sync
+# snap-sync [![Build Status](https://travis-ci.org/wesbarnett/snap-sync.svg?branch=master)](https://travis-ci.org/wesbarnett/snap-sync)
 
 ## About
 
