@@ -7,7 +7,7 @@
 # snapshot created on your system since that will be used to determine the
 # difference for the next incremental snapshot.
 
-version="0.3"
+version="0.4"
 name="snap-sync"
 
 TMPDIR=$(mktemp -d)
