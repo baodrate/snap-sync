@@ -46,7 +46,11 @@ die() {
     exit 1
 }
 
-sigkill() { 
+traperror() {
+    die "Exited due to error."
+}
+
+trapkill() { 
     die "Exited due to user intervention." 
 }
 
@@ -73,8 +77,8 @@ Options:
 EOF
 }
 
-trap error ERR
-trap sigkill SIGTERM SIGINT
+trap traperror ERR
+trap trapkill SIGTERM SIGINT
 ssh=""
 
 while [[ $# -gt 0 ]]; do
