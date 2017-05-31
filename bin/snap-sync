@@ -141,8 +141,9 @@ else
     fi
 fi
 
-TARGETS="$($ssh findmnt -n -v -t btrfs -o TARGET --list)"
-UUIDS="$($ssh findmnt -n -v -t btrfs -o UUID --list)"
+EXCLUDE_UUID=$(findmnt -n -v -t btrfs --target /etc/conf.d/snapper -o UUID)
+TARGETS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $2}')
+UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $1}')
 
 declare -a TARGETS_ARRAY
 declare -a UUIDS_ARRAY
@@ -164,6 +165,10 @@ for x in $TARGETS; do
     TARGETS_ARRAY[$i]=$x
     i=$((i+1))
 done
+
+if [[ "${#UUIDS_ARRAY[$@]}" -eq 0 ]]; then
+    die "No external btrfs subvolumes found to backup to."
+fi
 
 if [[ "$disk_count" > 1 ]]; then
     printf "Multiple mount points were found with UUID $uuid_cmdline.\n"
