@@ -58,9 +58,6 @@ trapkill() {
 trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
 trap trapkill SIGTERM SIGINT
 
-
-echo foo | grep bar
-
 notify_info() {
     for u in $(users); do
         sudo -u $u DISPLAY=:0 \
