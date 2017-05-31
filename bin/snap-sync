@@ -7,6 +7,8 @@
 # snapshot created on your system since that will be used to determine the
 # difference for the next incremental snapshot.
 
+set -o errtrace
+
 version="0.4"
 name="snap-sync"
 
@@ -15,14 +17,6 @@ PIPE=$TMPDIR/$name.out
 mkfifo $PIPE
 systemd-cat -t "$name" < $PIPE &
 exec 3>$PIPE
-
-notify_info() {
-    for u in $(users); do
-        sudo -u $u DISPLAY=:0 \
-        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
-        notify-send -a $name "$1" "$2" --icon=dialog-information
-    done
-}
 
 notify_error() {
     for u in $(users); do
@@ -47,7 +41,12 @@ die() {
 }
 
 traperror() {
-    die "Exited due to error."
+    out "==> ERROR: Exited due to error on line" $1
+    out "exit status:" "$2"
+    out "command:" "$3"
+    out "bash line:" "$4"
+    out "function name:" "$5"
+    exit 1
 }
 
 trapkill() { 
@@ -55,6 +54,17 @@ trapkill() {
 }
 
 [[ $EUID -ne 0 ]] && die "Script must be run as root." 
+
+trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
+trap trapkill SIGTERM SIGINT
+
+notify_info() {
+    for u in $(users); do
+        sudo -u $u DISPLAY=:0 \
+        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
+        notify-send -a $name "$1" "$2" --icon=dialog-information
+    done
+}
 
 usage() {
   cat <<EOF
@@ -77,10 +87,8 @@ Options:
 EOF
 }
 
-trap traperror ERR
-trap trapkill SIGTERM SIGINT
-ssh=""
 
+ssh=""
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
