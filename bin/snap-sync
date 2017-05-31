@@ -26,12 +26,8 @@ notify_error() {
     done
 }
 
-out() { 
-    printf "$1 $2\n" "${@:3}" | tee $PIPE
-}
-
 error() { 
-    out "==> ERROR:" "$@"
+    printf "==> ERROR: %s\n" "$@"
     notify_error 'Error' 'Check journal for more information.'
 } >&2
 
@@ -41,11 +37,11 @@ die() {
 }
 
 traperror() {
-    error "Exited due to error on line $1"
-    out "exit status:" "$2"
-    out "command:" "$3"
-    out "bash line:" "$4"
-    out "function name:" "$5"
+    printf "Exited due to error on line %s.\n" $1
+    printf "exit status: %s\n" "$2"
+    printf "command: %s\n" "$3"
+    printf "bash line: %s\n" "$4"
+    printf "function name: %s\n" "$5"
     exit 1
 }
 
@@ -171,7 +167,7 @@ if [[ "${#UUIDS_ARRAY[$@]}" -eq 0 ]]; then
 fi
 
 if [[ "$disk_count" > 1 ]]; then
-    printf "Multiple mount points were found with UUID $uuid_cmdline.\n"
+    printf "Multiple mount points were found with UUID %s.\n" "$uuid_cmdline"
     disk="-1"
 fi
 
@@ -182,7 +178,7 @@ if [[ "$disk" == -1 ]]; then
     if [[ -z $ssh ]]; then
         printf "Select a mounted BTRFS device on your local machine to backup to.\n"
     else
-        printf "Select a mounted BTRFS device on $remote to backup to.\n"
+        printf "Select a mounted BTRFS device on %s to backup to.\n" "$remote"
     fi
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
         for x in "${!TARGETS_ARRAY[@]}"; do
@@ -235,7 +231,7 @@ i=0
 for x in $selected_configs; do
 
     if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
-        printf "\nNOTE: Previous failed $name backup snapshots found for '$x'.\n" | tee $PIPE
+        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x" | tee $PIPE
         read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
         while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
             "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
@@ -286,7 +282,7 @@ for x in $selected_configs; do
     BACKUPDIRS_ARRAY[$i]="$BACKUPDIR"
     MYBACKUPDIR_ARRAY[$i]="$mybackupdir"
 
-    printf "Creating new snapshot for $x...\n" | tee $PIPE
+    printf "Creating new snapshot for %s...\n" "$x" | tee $PIPE
     new_num=$(snapper -c "$x" create --print-number -d "$name backup in progress")
     new_snap=$SUBVOLUME/.snapshots/$new_num/snapshot
     new_info=$SUBVOLUME/.snapshots/$new_num/info.xml
@@ -378,7 +374,7 @@ for x in $selected_configs; do
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
         btrfs send -c "$old_snap" "$new_snap" | $ssh btrfs receive "$backup_location"
-        printf "Deleting old snapshot for $x...\n" | tee $PIPE
+        printf "Deleting old snapshot for %s...\n" "$x" | tee $PIPE
         snapper -c "$x" delete "$old_num"
     fi
 
@@ -394,7 +390,7 @@ for x in $selected_configs; do
     userdata="backupdir=$mybackupdir, uuid=$selected_uuid"
 
     # Tag new snapshot as the latest
-    printf "Tagging new snapshot as latest backup for $x...\n" | tee $PIPE
+    printf "Tagging new snapshot as latest backup for %s...\n" "$x" | tee $PIPE
     snapper -v -c "$x" modify -d "$description" -u "$userdata" "$new_num"
 
     printf "Backup complete for configuration %s.\n" "$x" > $PIPE
