@@ -41,7 +41,7 @@ die() {
 }
 
 traperror() {
-    out "==> ERROR: Exited due to error on line" $1
+    error "Exited due to error on line $1"
     out "exit status:" "$2"
     out "command:" "$3"
     out "bash line:" "$4"
@@ -57,6 +57,9 @@ trapkill() {
 
 trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
 trap trapkill SIGTERM SIGINT
+
+
+echo foo | grep bar
 
 notify_info() {
     for u in $(users); do
