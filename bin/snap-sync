@@ -236,6 +236,20 @@ for x in $selected_configs; do
 
     if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
         printf "\nNOTE: Previous failed $name backup snapshots found for '$x'.\n" | tee $PIPE
+        read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
+        while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
+            "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
+            "$delete_failed" != [Nn] ]]; do
+            read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
+            if [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
+            "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
+            "$delete_failed" != [Nn] ]]; then
+                printf "Select 'y' or 'N'.\n"
+            fi
+        done
+        if [[ "$delete_failed" == [Yy]"es" || "$delete_failed" == [Yy] ]]; then
+            snapper -c $x delete $(snapper -c $x list | awk '/'$name' backup in progress/ {print $3}')
+        fi
     fi
 
     SNAP_SYNC_EXCLUDE=no
