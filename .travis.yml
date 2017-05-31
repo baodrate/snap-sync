@@ -1,0 +1,5 @@
+language: bash
+services:
+  - docker
+script:
+  - docker run --rm -v $PWD:/app:ro koalaman/shellcheck /app/bin/snap-sync
