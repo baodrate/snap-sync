@@ -230,6 +230,11 @@ printf "\nInitial configuration...\n" | tee $PIPE
 i=0
 for x in $selected_configs; do
 
+    if [[ "$(snapper -c $x list -t single | awk '/'"$selected_uuid"'/ {cnt++} END {print cnt}')" -gt 1 ]]; then
+        error "More than one snapper entry found with UUID $selected_uuid for configuration $x. Skipping configuration $x."
+        continue
+    fi
+
     if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
         printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x" | tee $PIPE
         read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
