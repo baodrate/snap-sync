@@ -209,7 +209,7 @@ fi
 if [[ -f /etc/conf.d/snapper ]]; then
     source /etc/conf.d/snapper 
 else
-    die "/etc/conf.d/snapper does not exist!"
+    SNAPPER_CONFIGS=$(echo $(ls /etc/snapper/configs))
 fi
 
 selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
