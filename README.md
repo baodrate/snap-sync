@@ -20,6 +20,25 @@ have to be sent.
 
 snapper is required.
 
+## Installation
+
+Run:
+
+    # make install
+
+By default it will look for the snapper configuration file at
+`/etc/sysconfig/snapper`. To change this pass `SNAPPER_CONFIG` to make
+with the location of the configuration file. For example, with Ubuntu
+you will want to install:
+
+    # make SNAPPER_CONFIG=/etc/default/snapper install
+
+For Arch Linux it would be:
+
+    # make SNAPPER_CONFIG=/etc/conf.d/snapper install
+
+The package is available in the [AUR](https://aur.archlinux.org/packages/snap-sync/).
+
 ## Options
 
     Usage: snap-sync [options]

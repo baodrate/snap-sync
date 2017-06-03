@@ -17,6 +17,7 @@
 
 PKGNAME = snap-sync
 PREFIX ?= /usr
+SNAPPER_CONFIG ?= /etc/sysconfig/snapper
 
 BIN_DIR = $(DESTDIR)$(PREFIX)/bin
 SYSTEMD_DIR = $(DESTDIR)$(PREFIX)/lib/systemd/system
@@ -24,5 +25,6 @@ SYSTEMD_DIR = $(DESTDIR)$(PREFIX)/lib/systemd/system
 .PHONY: install
 
 install:
+	sed -i 's@^SNAPPER_CONFIG.*@SNAPPER_CONFIG='$(SNAPPER_CONFIG)'@g' bin/$(PKGNAME)
 	@install -Dm755 bin/* -t $(BIN_DIR)/
 	@install -Dm644 systemd/* -t $(SYSTEMD_DIR)/

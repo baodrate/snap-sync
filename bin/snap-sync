@@ -12,6 +12,8 @@ set -o errtrace
 version="0.4"
 name="snap-sync"
 
+SNAPPER_CONFIG=/etc/sysconfig/snapper
+
 TMPDIR=$(mktemp -d)
 PIPE=$TMPDIR/$name.out
 mkfifo $PIPE
