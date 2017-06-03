@@ -70,6 +70,7 @@ trapkill() {
 }
 
 [[ $EUID -ne 0 ]] && die "Script must be run as root." 
+! [[ -f $SNAPPER_CONFIG ]] &&  die "$SNAPPER_CONFIG does not exist."
 
 trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
 trap trapkill SIGTERM SIGINT
@@ -157,7 +158,7 @@ else
     fi
 fi
 
-EXCLUDE_UUID=$(findmnt -n -v -t btrfs --target /etc/conf.d/snapper -o UUID)
+EXCLUDE_UUID=$(findmnt -n -v -t btrfs --target $SNAPPER_CONFIG -o UUID)
 TARGETS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $2}')
 UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $1}')
 
@@ -226,11 +227,7 @@ else
     printf "The disk is mounted at %s:%s.\n" "$remote" "$selected_mnt" | tee $PIPE
 fi
 
-if [[ -f /etc/conf.d/snapper ]]; then
-    source /etc/conf.d/snapper 
-else
-    die "/etc/conf.d/snapper does not exist!"
-fi
+source $SNAPPER_CONFIG
 
 selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
 
