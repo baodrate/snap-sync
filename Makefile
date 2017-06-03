@@ -1,5 +1,5 @@
 # snap-sync
-# https://github.com/wesbarnett/snap-pac
+# https://github.com/wesbarnett/snap-sync
 # Copyright (C) 2016, 2017 James W. Barnett
 
 # This program is free software; you can redistribute it and/or modify
