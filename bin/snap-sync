@@ -30,7 +30,7 @@ version="0.4"
 name="snap-sync"
 
 # The following line is modified by the Makefile
-SNAPPER_CONFIG=/etc/sysconfig/snapper
+SNAPPER_CONFIG=/etc/conf.d/snapper
 
 TMPDIR=$(mktemp -d)
 PIPE=$TMPDIR/$name.out
@@ -70,7 +70,7 @@ trapkill() {
 }
 
 [[ $EUID -ne 0 ]] && die "Script must be run as root." 
-! [[ -f $SNAPPER_CONFIG ]] &&  die "$SNAPPER_CONFIG does not exist."
+[[ -f $SNAPPER_CONFIG ]] || die "$SNAPPER_CONFIG does not exist."
 
 trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
 trap trapkill SIGTERM SIGINT
