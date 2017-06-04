@@ -29,8 +29,9 @@ set -o errtrace
 version="0.4"
 name="snap-sync"
 
-# The following line is modified by the Makefile
-SNAPPER_CONFIG=/etc/conf.d/snapper
+# The following line is modified by the Makefile or
+# find_snapper_config script
+SNAPPER_CONFIG=/etc/sysconfig/snapper
 
 TMPDIR=$(mktemp -d)
 PIPE=$TMPDIR/$name.out
