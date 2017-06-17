@@ -159,9 +159,14 @@ else
     fi
 fi
 
-EXCLUDE_UUID=$(findmnt -n -v -t btrfs --target $SNAPPER_CONFIG -o UUID)
-TARGETS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $2}')
-UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $1}')
+if [[ "$(findmnt -n -v --target / -o FSTYPE)" == "btrfs" ]]; then
+    EXCLUDE_UUID=$(findmnt -n -v -t btrfs --target / -o UUID)
+    TARGETS=$($ssh findmnt -n -v -t btrfs -o TARGET --list | grep -v $EXCLUDE_UUID)
+    UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID --list | grep -v $EXCLUDE_UUID)
+else
+    TARGETS=$($ssh findmnt -n -v -t btrfs -o TARGET --list)
+    UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID --list)
+fi
 
 declare -a TARGETS_ARRAY
 declare -a UUIDS_ARRAY
