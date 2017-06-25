@@ -78,9 +78,6 @@ trapkill() {
     die "Exited due to user intervention." 
 }
 
-[[ $EUID -ne 0 ]] && die "Script must be run as root." 
-! [[ -f $SNAPPER_CONFIG ]] && die "$SNAPPER_CONFIG does not exist."
-
 trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
 trap trapkill SIGTERM SIGINT
 
@@ -140,6 +137,9 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
+
+[[ $EUID -ne 0 ]] && die "Script must be run as root." 
+! [[ -f $SNAPPER_CONFIG ]] && die "$SNAPPER_CONFIG does not exist."
 
 description=${description:-"latest incremental backup"}
 uuid_cmdline=${uuid_cmdline:-"none"}
