@@ -39,12 +39,20 @@ mkfifo $PIPE
 systemd-cat -t "$name" < $PIPE &
 exec 3>$PIPE
 
-notify_error() {
-    for u in $(users); do
+notify() {
+    for u in $(users | sed 's/ /\n/' | sort -u); do
         sudo -u $u DISPLAY=:0 \
         DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
-        notify-send -a $name "$1" "$2" --icon=dialog-error
+        notify-send -a $name "$1" "$2" --icon="dialog-$3"
     done
+}
+
+notify_info() {
+    notify "$1" "$2" "information"
+}
+
+notify_error() {
+    notify "$1" "$2" "error"
 }
 
 error() { 
@@ -75,14 +83,6 @@ trapkill() {
 
 trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
 trap trapkill SIGTERM SIGINT
-
-notify_info() {
-    for u in $(users); do
-        sudo -u $u DISPLAY=:0 \
-        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
-        notify-send -a $name "$1" "$2" --icon=dialog-information
-    done
-}
 
 usage() {
   cat <<EOF
