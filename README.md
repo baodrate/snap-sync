@@ -24,7 +24,15 @@ snapper is required.
 
     # make install
 
-The package is available in the [AUR](https://aur.archlinux.org/packages/snap-sync/).
+If your system uses a non-default location for the snapper
+configuration file, specify it on the command line with
+`SNAPPER_CONFIG`. For example, for
+Arch Linux use:
+
+    # make SNAPPER_CONFIG=/etc/conf.d/snapper install
+
+The package is also available in the
+[AUR](https://aur.archlinux.org/packages/snap-sync/).
 
 ## Options
 
