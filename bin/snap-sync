@@ -39,6 +39,12 @@ mkfifo $PIPE
 systemd-cat -t "$name" < $PIPE &
 exec 3>$PIPE
 
+donotify=0
+which notify-send &> /dev/null
+if [[ $? -ne 0 ]]; then
+    donotify=1
+fi
+
 notify() {
     for u in $(users | sed 's/ /\n/' | sort -u); do
         sudo -u $u DISPLAY=:0 \
@@ -48,11 +54,19 @@ notify() {
 }
 
 notify_info() {
-    notify "$1" "$2" "information"
+    if [[ $donotify -eq 0 ]]; then
+        notify "$1" "$2" "information"
+    else
+        printf "$1: $2\n"
+    fi
 }
 
 notify_error() {
-    notify "$1" "$2" "error"
+    if [[ $donotify -eq 0 ]]; then
+        notify "$1" "$2" "error"
+    else
+        printf "$1: $2\n"
+    fi
 }
 
 error() { 
