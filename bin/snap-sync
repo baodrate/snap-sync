@@ -39,6 +39,20 @@ mkfifo $PIPE
 systemd-cat -t "$progname" < $PIPE &
 exec 3>$PIPE
 
+###
+# functions
+###
+
+die() {
+    error "$@"
+    exit 1
+}
+
+error() {
+    printf "==> ERROR: %s\n" "$@"
+    notify_error 'Error' 'Check journal for more information.'
+} >&2
+
 notify() {
     for u in $(users | sed 's/ /\n/' | sort -u); do
         sudo -u $u DISPLAY=:0 \
@@ -55,14 +69,87 @@ notify_error() {
     notify "$1" "$2" "error"
 }
 
-error() {
-    printf "==> ERROR: %s\n" "$@"
-    notify_error 'Error' 'Check journal for more information.'
-} >&2
+parse_params () {
+    ###
+    # Evaluate given call parameters
+    ###
+    while [ $# -gt 0 ]; do
+	key="$1"
+	case $key in
+            -h | --help | \-\? | --usage)
+                #  Call usage() function.
+                usage
+                ;;
+            -d|--description)
+		description="$2"
+		shift 2
+		;;
+            -c|--config)
+		selected_config="$2"
+		shift 2
+		;;
+	    --config=*)
+                selected_config=${1#*=}
+                shift
+                ;;
+            -u|--UUID)
+		uuid_cmdline="$2"
+		shift 2
+		;;
+	    --UUID=*)
+                uuid_cmdline=${1#*=}
+                shift
+                ;;
+            -n|--noconfirm)
+		noconfirm=1
+		nonotify=1
+		shift
+		;;
+	    --remote)
+		remote=$2
+		ssh="ssh $remote"
+		shift 2
+		;;
+            -v|--verbose)
+		verbose=1
+		shift 1
+		;;
+            --) # End of all options
+                shift
+                break
+               ;;
+            -*)
+                echo "WARN: Unknown option (ignored): $1" >&2
+                #shift
+                exit 1
+                ;;
+            *)
+		die "Unknown option: $key\nRun '$progname -h' for valid options.\n"
+		;;
+	esac
+    done
 
-die() {
-    error "$@"
-    exit 1
+    # Set reasonable defaults
+    source $SNAPPER_CONFIG
+    selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
+
+    description=${description:-"latest incremental backup"}
+    uuid_cmdline=${uuid_cmdline:-"none"}
+    target_cmdline=${target_cmdline:-"none"}
+    if [ -z $remote ]; then
+	ssh=""
+    fi
+
+    if [ "$verbose" ]; then
+	echo "Snap UUID :       '$uuid_cmdline'"
+	echo "Snap Description: '$description'"
+	echo "Snap Config:      '$selected_config'"
+	echo "Snap Remote:      '$ssh'"
+
+	if [ "$verbose" ]; then snap_sync_options="verbose=true"; fi
+	if [ "$noconfirm" ]; then snap_sync_options="${snap_sync_options} noconfirm=true"; fi
+	echo "Options:          ${snap_sync_options}"
+    fi
 }
 
 traperror() {
@@ -77,9 +164,6 @@ traperror() {
 trapkill() {
     die "Exited due to user intervention."
 }
-
-trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
-trap trapkill SIGTERM SIGINT
 
 usage() {
   cat <<EOF
@@ -98,52 +182,25 @@ Options:
  --remote <address>       Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
                           should specify the remote machine's hostname or ip address. The 'root' user must be
                           permitted to login on the remote machine.
+ -v, --verbose            Be more verbose on what's going on.
 
 EOF
 }
 
+###
+# Main
+###
 
+trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCPROGNAME[@]}"' ERR
+trap trapkill SIGTERM SIGINT
+
+cwd=`pwd`
 ssh=""
-while [[ $# -gt 0 ]]; do
-    key="$1"
-    case $key in
-        -d|--description)
-            description="$2"
-            shift 2
-        ;;
-        -c|--config)
-            selected_configs="$2"
-            shift 2
-        ;;
-        -u|--UUID)
-            uuid_cmdline="$2"
-            shift 2
-        ;;
-        -n|--noconfirm)
-            noconfirm="yes"
-            shift
-        ;;
-        -h|--help)
-            usage
-            exit 1
-        ;;
-	    --remote)
-            remote=$2
-            ssh="ssh $remote"
-            shift 2
-	    ;;
-        *)
-            die "Unknown option: $key\nRun '$name -h' for valid options.\n"
-        ;;
-    esac
-done
+
+parse_params $@
 
 [[ $EUID -ne 0 ]] && die "Script must be run as root."
 ! [[ -f $SNAPPER_CONFIG ]] && die "$SNAPPER_CONFIG does not exist."
-
-description=${description:-"latest incremental backup"}
-uuid_cmdline=${uuid_cmdline:-"none"}
-noconfirm=${noconfirm:-"no"}
 
 if [[ "$uuid_cmdline" != "none" ]]; then
     if [[ -z $ssh ]]; then
