@@ -43,6 +43,23 @@ exec 3>$PIPE
 # functions
 ###
 
+check_prerequisites () {
+
+    # requested binaries:
+    which awk >/dev/null 2>&1 || { echo "'awk' is not installed." && exit 1; }
+    which sed >/dev/null 2>&1 || { echo "'sed' is not installed." && exit 1; }
+    which tee >/dev/null 2>&1 || { echo "'tee' is not installed." && exit 1; }
+    which btrfs >/dev/null 2>&1 || { echo "'btrfs' is not installed." && exit 1; }
+    which findmnt >/dev/null 2>&1 || { echo "'findmnt' is not installed." && exit 1; }
+    which notify-send >/dev/null 2>&1 || { echo "'notify-send' is not installed." && exit 1; }
+
+    if [ $(id -u) -ne 0 ] ; then echo "Script must be run as root" ; exit 1 ; fi
+
+    if [ ! -r "$SNAPPER_CONFIG" ]; then
+	die "$SNAPPER_CONFIG does not exist."
+    fi
+}
+
 die() {
     error "$@"
     exit 1
@@ -199,8 +216,7 @@ ssh=""
 
 parse_params $@
 
-[[ $EUID -ne 0 ]] && die "Script must be run as root."
-! [[ -f $SNAPPER_CONFIG ]] && die "$SNAPPER_CONFIG does not exist."
+check_prerequisites
 
 if [[ "$uuid_cmdline" != "none" ]]; then
     if [[ -z $ssh ]]; then
@@ -289,10 +305,6 @@ if [[ -z $ssh ]]; then
 else
     printf "The disk is mounted at %s:%s.\n" "$remote" "$selected_mnt" | tee $PIPE
 fi
-
-source $SNAPPER_CONFIG
-
-selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
 
 declare -a BACKUPDIRS_ARRAY
 declare -a MYBACKUPDIR_ARRAY
