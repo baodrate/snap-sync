@@ -39,9 +39,9 @@ systemd-cat -t "$progname" < $PIPE &
 exec 3>$PIPE
 
 # global variables
-#disk_uuid_$i
 disk_count=-1
 disk_uuid_match_count=0
+disk_target_match_count=0
 disk_uuid_match=''
 selected_uuid='none'
 selected_target='none'
@@ -60,6 +60,8 @@ check_prerequisites () {
     which tee >/dev/null 2>&1 || { echo "'tee' is not installed." && exit 1; }
     which btrfs >/dev/null 2>&1 || { echo "'btrfs' is not installed." && exit 1; }
     which findmnt >/dev/null 2>&1 || { echo "'findmnt' is not installed." && exit 1; }
+    which systemd-cat >/dev/null 2>&1 || { echo "'systemd-cat' is not installed." && exit 1; }
+    which wc >/dev/null 2>&1 || { echo "'wc' is not installed." && exit 1; }
     which notify-send >/dev/null 2>&1 || { echo "'notify-send' is not installed." && exit 1; }
 
     if [ $(id -u) -ne 0 ] ; then echo "Script must be run as root" ; exit 1 ; fi
@@ -89,9 +91,11 @@ get_disk_infos () {
 	exclude_uuid=$(findmnt --noheadings --nofsroot --types btrfs --target / --output UUID)
 	disk_uuids=$($ssh findmnt --noheadings --nofsroot --types btrfs --output UUID,TARGET --list | grep -v $exclude_uuid | awk '{print $1}')
 	disk_targets=$($ssh findmnt --noheadings --nofsroot --types btrfs --output UUID,TARGET --list | grep -v $exclude_uuid | awk '{print $2}')
+	fs_options=$($ssh findmnt --noheadings --nofsroot --types btrfs --output UUID,OPTIONS --list | grep -v $exclude_uuid | awk '{print $2}')
     else
 	disk_uuids=$($ssh findmnt --noheadings --nofsroot --types btrfs --output UUID --list)
-	disk_targets=$($ssh findmnt --noheadings --nofsroot --types btrfs --output UUID,TARGET --list)
+	disk_targets=$($ssh findmnt --noheadings --nofsroot --types btrfs --output TARGET --list)
+	fs_options=$($ssh findmnt --noheadings --nofsroot --types btrfs --output UUID,OPTIONS --list | awk '{print $2}')
     fi
 
     # we need at least one target disk
@@ -102,8 +106,10 @@ get_disk_infos () {
     # Pseudo-Arrays (assumption: equal number of members)
     # Pseudo-Array: disk_uuid_$i
     # Pseudo-Array: disk_target_$i
+    # Pseudo-Array: fs_options_$i
     # Pseudo-Array: disk_selected_$y (reference to $i element)
     # List: disk_uuid_match (reference to matching preselected uuids)
+    # List: disk_target_match (reference to matching preselected targets)
 
     # initialize our structures
     i=0
@@ -122,12 +128,22 @@ get_disk_infos () {
     done
     i=0
     for disk_target in $disk_targets; do
+	if [ "$disk_target" = "$target_cmdline" ]; then
+	    disk_target_match="$i"
+            disk_target_match_count=$(($disk_target_match_count+1))
+	fi
 	eval "disk_target_$i='$disk_target'"
+	i=$((i+1))
+    done
+    i=0
+    for fs_option in $fs_options; do
+	eval "fs_options_$i='$fs_option'"
 	i=$((i+1))
     done
 }
 
 notify () {
+    # estimation: batch calls should just log
     if [ nonotify ]; then
 	printf "%s %s\n" "$progname" "$2"
     else
@@ -158,40 +174,52 @@ parse_params () {
                 #  Call usage() function.
                 usage
                 ;;
-            -d|--description)
-		description="$2"
-		shift 2
-		;;
             -c|--config)
 		selected_config="$2"
 		shift 2
 		;;
-	    --config=*)
-                selected_config=${1#*=}
-                shift
-                ;;
-            -u|--UUID)
-		uuid_cmdline="$2"
+            -d|--description)
+		description="$2"
 		shift 2
 		;;
-	    --UUID=*)
-                uuid_cmdline=${1#*=}
-                shift
-                ;;
+	    --dry-run)
+		dryrun=1
+		shift 1
+		;;
+            -l|--TARGET)
+		target_cmdline="$2"
+		shift 2
+		;;
             -n|--noconfirm)
 		noconfirm=1
 		nonotify=1
 		shift
 		;;
-	    --remote)
-		remote=$2
-		ssh="ssh $remote"
+            -u|--UUID)
+		uuid_cmdline="$2"
 		shift 2
 		;;
             -v|--verbose)
 		verbose=1
 		shift 1
 		;;
+	    --config=*)
+                selected_config=${1#*=}
+                shift
+                ;;
+	    --remote)
+		remote=$2
+		ssh="ssh $remote"
+		shift 2
+		;;
+	    --TARGET=*)
+                target_cmdline=${1#*=}
+                shift
+                ;;
+	    --UUID=*)
+                uuid_cmdline=${1#*=}
+                shift
+                ;;
             --) # End of all options
                 shift
                 break
@@ -220,11 +248,13 @@ parse_params () {
 
     if [ "$verbose" ]; then
 	echo "Snap UUID :       '$uuid_cmdline'"
+	echo "Snap TARGET:      '$target_cmdline'"
 	echo "Snap Description: '$description'"
 	echo "Snap Config:      '$selected_config'"
 	echo "Snap Remote:      '$ssh'"
 
 	if [ "$verbose" ]; then snap_sync_options="verbose=true"; fi
+	if [ "$dryrun" ]; then snap_sync_options="${snap_sync_options} dry-run=true"; fi
 	if [ "$noconfirm" ]; then snap_sync_options="${snap_sync_options} noconfirm=true"; fi
 	echo "Options:          ${snap_sync_options}"
     fi
@@ -245,7 +275,7 @@ run_config () {
 	count=$(eval snapper -c $selected_config list -t single | awk '/uuid='"$selected_uuid"'/, /subvolid'="$selected_subvol"'/ {cnt++} END {print cnt}')
 	#count=$(eval snapper -c $selected_config list -t single | grep -c -e "subvolid=$selected_subvol" -e 'uuid=$selected_uuid')
 	if [ -n "$count" ] && [ "$count" -gt 1 ]; then
-	    error "More than one snapper entry found with UUID $selected_uuid for configuration '$selected_config'. Skipping configuration '$selected_config'."
+	    error "More than one snapper entry found with UUID $selected_uuid and SUBVOL $selected_subvol for configuration '$selected_config'. Skipping configuration '$selected_config'."
 	    selected_configs=$(echo $selected_configs | sed -e "s/\($selected_config*\)//")
 	    if [ "$verbose" ]; then
 		printf "Counter=%s" "$count"
@@ -331,15 +361,17 @@ run_config () {
 	    else
 		backup_root="$selected_target/$backupdir"
 	    fi
-	    ### Todo: if interactive, e.g use pv to show progress
-	    printf "Please be pacient, the initial backup could take awhile.\n"
 	else
             if [ "$verbose" ]; then
 		printf "Last syncronized Snapshot-ID for '%s': %s\n" "$selected_config" "$snapper_sync_id"
 		printf "Last syncronized Snapshot-Path for '%s': %s\n" "$selected_config" "$snapper_sync_snapshot"
 	    fi
-	    backupdir=$(snapper -c "$selected_config" list -t single | awk -F "|" '/'"$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
-	    backup_root="$selected_target/$backupdir"
+	    backupdir=$(snapper -c "$selected_config" list -t single | awk -F "|" '/'"$selected_uuid"'/, /subvolid'="$selected_subvol"'/  {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
+	    if [ -z "$backupdir" ]; then
+		backup_root="$selected_target"
+	    else
+		backup_root="$selected_target/$backupdir"
+	    fi
 	    $ssh test -d $backup_root || die "%s is not a directory on %s.\n" "$backup_root" "$selected_uuid"
 	fi
 
@@ -348,20 +380,27 @@ run_config () {
 
         if [ "$verbose" ]; then
 	    if [ -n "$ssh" ];then
-		printf "Backup-Path on remote %s: %s/%s\n" "$remote" "$backup_root" "backupdir"
+		printf "Backup-Path on remote %s: %s/%s\n" "$remote" "$backup_root" "$backupdir"
 	    else
-		printf "Backup-Path: %s/%s\n" "$backup_root" "backupdir"
+		printf "Backup-Path: %s/%s\n" "$backup_root" "$backupdir"
 	    fi
 	fi
 
 	# acting on source system
-	printf "Creating new snapshot for snapper config '%s' ...\n" "$selected_config" | tee $PIPE
-	snapper_new_id=$(snapper -c "$selected_config" create --print-number -d "$progname backup in progress")
-	snapper_new_snapshot=$SUBVOLUME/.snapshots/$snapper_new_id/snapshot
-	snapper_new_info=$SUBVOLUME/.snapshots/$snapper_new_id/info.xml
-	sync
+	if [ ! $dryrun ]; then
+	    printf "Creating new snapshot with snapper config '%s' ...\n" "$selected_config" | tee $PIPE
+	    snapper_new_id=$(snapper -c "$selected_config" create --print-number -d "$progname backup in progress")
+	    snapper_new_snapshot=$SUBVOLUME/.snapshots/$snapper_new_id/snapshot
+	    snapper_new_info=$SUBVOLUME/.snapshots/$snapper_new_id/info.xml
+	    sync
+	else
+	    printf "dryrun: Creating new snapshot with snapper config '%s' ...\n" "$selected_config" | tee $PIPE
+	fi
 
-	snapper_target_snapshot=$backup_root/$selected_config/$snapper_new_id
+	# if we want to use snapper on the target to supervise the synced snapshots
+	# the backup_location needs to be in a subvol ".snapshots" inside $selected_config (hardcoded in snapper)
+	snapper_target_subvol=.snapshots
+	snapper_target_snapshot=$backup_root/$selected_config/$snapper_target_subvol/$snapper_new_id
 	if [ -z "$ssh" ]; then
 	    printf "Will backup %s to %s\n" "$snapper_new_snapshot" "$snapper_target_snapshot/snapshot" | tee $PIPE
 	else
@@ -456,49 +495,80 @@ run_backup () {
 	snapper_sync_snapshot=$(eval echo \$snapper_sync_snapshot_$i)
 	snapper_new_snapshot=$(eval echo \$snapper_new_snapshot_$i)
 	snapper_new_info=$(eval echo \$snapper_new_info_$i)
+	snapper_target_subvol=$(eval echo \$snapper_target_subvol_$i)
 	snapper_target_snapshot=$(eval echo \$snapper_target_snapshot_$i)
 
-	# verify target structure for backupdir
-	verify_snapper_structure $backup_root $snapper_config $snapper_new_id
+	if [ ! "$dryrun" ]; then
+	    verify_snapper_structure $backup_root $snapper_config $snapper_target_subvol $snapper_new_id
+	else
+	    cmd="verify_snapper_structure $backup_root $snapper_config $snapper_target_subvol $snapper_new_id"
+	    printf "dryrun: %s\n" "$cmd"
+	fi
 
 	if [ -z "$snapper_sync_id" ]; then
 	    cmd="btrfs send $snapper_new_snapshot | $ssh btrfs receive $snapper_target_snapshot"
-            printf "Sending first snapshot for snapper config '%s'...\n" "$selected_config" | tee $PIPE
+            printf "Sending first snapshot for snapper config '%s' ...\n" "$selected_config" | tee $PIPE
             if [ "$verbose" ]; then
-		printf "$cmd"
+		echo "btrfs send $snapper_new_snapshot | $ssh btrfs receive $snapper_target_snapshot"
+		cmd="btrfs send -v $snapper_new_snapshot | $ssh btrfs receive -v $snapper_target_snapshot"
 	    fi
-	    btrfs send "$snapper_new_snapshot" | $ssh btrfs receive "$snapper_target_snapshot" &>/dev/null
+	    if [ ! "$dryrun" ]; then
+	       btrfs send "$snapper_new_snapshot" | $ssh btrfs receive "$snapper_target_snapshot" &>/dev/null
+	    else
+	       cmd="btrfs send -v $snapper_new_snapshot | $ssh btrfs receive -v $snapper_target_snapshot"
+	       printf "dryrun: %s\n" "$cmd"
+	    fi
 	else
-            printf "Sending incremental snapshot for snapper config '%s'...\n" "$selected_config" | tee $PIPE
+            printf "Sending incremental snapshot for snapper config '%s' ...\n" "$selected_config" | tee $PIPE
             # Sends the difference between the new snapshot and old snapshot to the
             # backup location. Using the -c flag instead of -p tells it that there
             # is an identical subvolume to the old snapshot at the receiving
             # location where it can get its data. This helps speed up the transfer.
-	    cmd="btrfs send -c $snapper_sync_snapshot $snapper_new_snapshot | $ssh btrfs receive $snapper_target_snapshot"
-	    $cmd  &>/dev/null
-            if [ "$verbose" ]; then
-		printf "$cmd"
-		printf "Deleting sync snapshot for %s...\n" "$selected_config" | tee $PIPE
+	    verbose_flag="-v"
+	    if [ ! "$dryrun" ]; then
+               btrfs send "$verbose_flag" -c "$snapper_sync_snapshot" "$snapper_new_snapshot" | $ssh btrfs receive "$verbose_flag" "$snapper_target_snapshot"
+               if [ "$verbose" ]; then
+		   printf "Deleting sync snapshot for %s ...\n" "$selected_config" | tee $PIPE
+	       fi
+               snapper -c "$selected_config" delete "$snapper_sync_id"
+	    else
+	       printf "dryrun: btrfs send %s -c %s  %s | %s btrfs receive %s %s\n" \
+		       "$verbose_flag" "$snapper_sync_snapshot" "$snapper_new_snapshot" \
+		       "$ssh" "$verbose_flag" "$snapper_target_snapshot"
+	       printf "dryrun: snapper -c %s delete %a\n" "$selected_config" "$snapper_sync_id"
 	    fi
-	    btrfs send -c "$snapper_sync_snapshot" "$snapper_new_snapshot" | $ssh btrfs receive "$snapper_target_snapshot"  &>/dev/null
-            snapper -c "$selected_config" delete "$snapper_sync_id"
 	fi
 
 	if [ -z "$ssh" ]; then
-	    cp "$snapper_new_info" "$snapper_target_snapshot"
+	    if [ ! "$dryrun" ]; then
+		cp "$snapper_new_info" "$snapper_target_snapshot"
+	    else
+               cmd="cp $snapper_new_info $snapper_target_snapshot"
+	       printf "dryrun: %s\n" "$cmd"
+	    fi
 	else
-	    rsync -avzq "$snapper_new_info" "$remote":"$snapper_target_snapshot"
+	    if [ ! "$dryrun" ]; then
+		rsync -avzq "$snapper_new_info" "$remote":"$snapper_target_snapshot"
+	    else
+		cmd="rsync -avzq $snapper_new_info $remote:$snapper_target_snapshot"
+		printf "dryrun: %s\n" "$cmd"
+	    fi
 	fi
 
 	# It's important not to change the values of the key/value pairs ($userdata)
 	# which is stored in snappers info.xml file of the source snapshot.
 	# This is how we find the parent.
 
-	userdata="backupdir=$backup_dir, uuid=$selected_uuid"
+	userdata="backupdir=$backup_dir, uuid=$selected_uuid, subvolid=$selected_subvol"
 
 	# Tag new snapshot as the latest
 	printf "Tagging new snapshot as latest backup for '%s' ...\n" "$selected_config" | tee $PIPE
-	snapper -v -c "$selected_config" modify -d "$description" -u "$userdata" "$snapper_new_id"
+	if [ ! "$dryrun" ]; then
+	    snapper -v -c "$selected_config" modify -d "$description" -u "$userdata" "$snapper_new_id"
+	else
+	    cmd="snapper -v -c $selected_config modify -d $description -u $userdata $snapper_new_id"
+	    printf "dryrun: %s\n" "$cmd"
+	fi
 	printf "Backup complete for snapper configuration '%s'.\n" "$selected_config" > $PIPE
     done
 
@@ -511,6 +581,8 @@ select_target_disk () {
 
     #local disk_selected_ids=''
     local disk_selected_count=0
+    local subvolid=''
+    local subvol=''
 
     # print selection table
     if [ -z "$ssh" ]; then
@@ -519,6 +591,16 @@ select_target_disk () {
         printf "Selecting a mounted BTRFS device for backups on %s.\n" "$remote"
     fi
     while [ "$disk_id" -eq -1 ] || [ "$disk_id" -le $disk_count ]; do
+	if [ "$disk_target_match_count" -eq 1 ]; then
+	    # matching TARGET selection from commandline
+	    # Pseudo-Array: disk_selected_$i (reference to $disk_uuid element)
+	    eval "disk_selected_$i='$disk_target_match'"
+	    disk=$(eval echo \$disk_uuid_$disk_target_match)
+	    target=$(eval echo \$disk_target_$disk_target_match)
+	    fs_options=$(eval echo \$fs_options_$disk_target_match | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
+	    disk_selected=$disk_target_match
+	    break
+	fi
 	if [ "$disk_uuid_match_count" -gt 1 ]; then
 	    # got UUID selection from commandline
 	    disk_count=$disk_uuid_match_count
@@ -529,8 +611,8 @@ select_target_disk () {
 		# Pseudo-Array: disk_selected_$i (reference to $disk_uuid element)
 		eval "disk_selected_$i='$disk_uuid'"
 		disk=$(eval echo \$disk_uuid_$disk_uuid)
-		target=$(eval echo \$disk_target_$disk_uuid)
-		printf "%4s) %s %s\n" "$i" "$disk" "$target"
+		fs_options=$(eval echo \$fs_options_$disk_uuid | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
+		printf "%4s) %s %s (%s)\n" "$i" "$disk" "$target" "$fs_options"
 		i=$((i+1))
 	    done
 	else
@@ -540,7 +622,8 @@ select_target_disk () {
 		eval disk_selected_$i="$disk_id"
 		disk=$(eval echo \$disk_uuid_$disk_id)
 		target=$(eval echo \$disk_target_$disk_id)
-		printf "%4s) %s %s\n" "$disk_id" "$disk" "$target"
+		fs_options=$(eval echo \$fs_options_$disk_id | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
+		printf "%4s) %s %s (%s)\n" "$disk_id" "$disk" "$target" "$fs_options"
 		i=$((i+1))
 		disk_id=$(($disk_id+1))
 	    done
@@ -572,24 +655,25 @@ select_target_disk () {
 
     selected_uuid=$(eval echo \$disk_uuid_$disk_selected)
     selected_target=$(eval echo \$disk_target_$disk_selected)
+    selected_subvol=$(eval echo \$fs_options_$disk_selected | sed -e 's/.*subvolid=\([0-9]*\).*/\1/')
+    #fs_options=$(eval echo \$fs_options_$disk_selected | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
+    if [ "$verbose" ]; then
+	printf "Selected Subvol-ID=%s: %s on %s\n" "$selected_subvol" "$selected_target"  "$selected_uuid"
+     fi
 }
 
 traperror () {
     printf "Exited due to error on line %s.\n" $1
     printf "exit status: %s\n" "$2"
-    printf "command: %s\n" "$3"
-    printf "bash line: %s\n" "$4"
-    printf "function name: %s\n" "$5"
+    #printf "command: %s\n" "$3"
+    #printf "bash line: %s\n" "$4"
+    #printf "function name: %s\n" "$5"
     exit 1
 }
 
 trapkill () {
     die "Exited due to user intervention."
 }
-
-# bashism
-#trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
-#trap trapkill SIGTERM SIGINT
 
 usage () {
   cat <<EOF
@@ -605,9 +689,11 @@ Options:
                           directory name on first backup"
  -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt."
                           If multiple mount points are found with the same UUID, will prompt user."
-     --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
-                          should specify the remote machine's hostname or ip address. The 'root' user must be
+ -l, --TARGET <target>    Specify the mountpoint of the BTRFS subvolume to back up to.
+     --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You 
+                          should specify the remote machine's hostname or ip address. The 'root' user must be 
                           permitted to login on the remote machine.
+     --dry-run            perform a trial run where no changes are made.
  -v, --verbose            Be more verbose on what's going on.
 
 EOF
@@ -618,7 +704,8 @@ EOF
 verify_snapper_structure () {
     local backup_root=$1
     local snapper_config=$2
-    local snapper_id=$3
+    local snapper_subvol=$3
+    local snapper_id=$4
 
     if [ "$verbose" ]; then
 	echo "Verify snapper filesystem structure on target ..."
@@ -632,11 +719,26 @@ verify_snapper_structure () {
 	$ssh mkdir --mode=0700 --parents $backup_root/$snapper_config
     fi
 
-    if $ssh [ ! -d $backup_root/$snapper_config/$snapper_id  ]; then
+    # if not accessible, create subvolume to hold snappers snapshot structure
+    create_subvol="btrfs subvolume create $backup_root/$snapper_config/$snapper_subvol"
+
+    # check if given snapper_subvol is a subvol
+    if $ssh [ ! -d $backup_root/$snapper_config/$snapper_subvol ]; then
 	if [ "$verbose" ]; then
-	    echo "Create backup-path $backup_root/$snapper_config/$snapper_id"
+	    echo "Create new subvolume $backup_root/$snapper_config/$snapper_subvol"
 	fi
-	$ssh mkdir --mode=0700 $backup_root/$snapper_config/$snapper_id
+	$ssh $create_subvol || die "BTRFS subvolume %s to hold snapshots for config %s could not be created in directory on %s.\n" "$snapper_subvol" "$snapper_config" "$backup_root"
+    else
+	if $ssh [ `stat --format=%i $backup_root/$snapper_config/$snapper_subvol` -ne 256 ]; then
+	    die "%s needs to be a BTRFS subvolume. But given %s is just a directory.\n" "$snapper_subvol" "$backup_root/$snapper_config/$snapper_subvol"
+	fi
+    fi
+
+    if $ssh [ ! -d $backup_root/$snapper_config/$snapper_subvol/$snapper_id  ]; then
+	if [ "$verbose" ]; then
+	    echo "Create backup-path $backup_root/$snapper_config/$snapper_subvol/$snapper_id"
+	fi
+	$ssh mkdir --mode=0700 $backup_root/$snapper_config/$snapper_subvol/$snapper_id
     fi
 }
 
@@ -647,6 +749,11 @@ verify_snapper_structure () {
 cwd=`pwd`
 ssh=""
 
+# this bashism has to be adapted
+#trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
+trap 'traperror ${LINENO} $?"' ERR
+trap trapkill SIGTERM SIGINT
+
 parse_params $@
 
 check_prerequisites
@@ -654,14 +761,20 @@ check_prerequisites
 # read mounted BTRFS structures
 get_disk_infos
 
-if [ "$uuid_cmdline" != "none" ]; then
+if [ "target_cmdline" != "none" ]; then
+    if [ -z "$ssh" ]; then
+        notify_info "Backup started" "Starting backups to '$target_cmdline' ..."
+    else
+        notify_info "Backup started" "Starting backups to '$target_cmdline'  at $remote ..."
+    fi
+elif [ "$uuid_cmdline" != "none" ]; then
     if [ -z $ssh ]; then
         notify_info "Backup started" "Starting backups to $uuid_cmdline..."
     else
         notify_info "Backup started" "Starting backups to $uuid_cmdline at $remote..."
     fi
 else
-    if [ -z $ssh ]; then
+    if [ -z "$ssh" ]; then
         notify_info "Backup started" "Starting backups. Use command line menu to select disk."
     else
         notify_info "Backup started" "Starting backups. Use command line menu to select disk on $remote."
@@ -672,7 +785,7 @@ fi
 select_target_disk
 
 printf "\nYou selected the disk with UUID %s.\n" "$selected_uuid" | tee $PIPE
-if [ -z $ssh ]; then
+if [ -z "$ssh" ]; then
     printf "The disk is mounted at %s.\n" "$selected_target" | tee $PIPE
 else
     printf "The disk is mounted at %s:%s.\n" "$remote" "$selected_target" | tee $PIPE
