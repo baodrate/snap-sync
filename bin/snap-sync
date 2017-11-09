@@ -26,7 +26,7 @@
 # difference for the next incremental snapshot.
 
 progname="`basename v$0`"
-version="0.4.3"
+version="0.4.4"
 
 # The following line is modified by the Makefile or
 # find_snapper_config script
