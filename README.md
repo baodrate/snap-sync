@@ -59,22 +59,6 @@ The first time you run `snap-sync` for a particular disk (new UUID) you will be
 prompted to choose a backup location on that disk. If the directory you specify
 does not exist, it will be created.
 
-## Systemd unit and timer
-
-A systemd unit and timer are included. These are instantiated units. You need to
-specify the UUID of the disk to back up to in the `systemctl` call. Note, once
-again, the disk **must** be mounted, and it **must** only be mounted in one
-place. Example:
-
-    # systemctl start snap-sync@7360922b-c916-4d9f-a670-67fe0b91143c
-
-The timer included is weekly. Edit both files to your taste.
-
-You can exclude a configuration from backup by setting `SNAP_SYNC_EXCLUDE=yes`
-in your snapper configuration file. Additionally you should run snap-sync at
-least once for a new disk without using the service so you can be prompted for
-the backup location.
-
 ## Example command line usage
 
 ### No arguments
