@@ -26,12 +26,12 @@
 
 set -o errtrace
 
-version="0.4.2"
+version="0.5"
 name="snap-sync"
 
 # The following line is modified by the Makefile or
 # find_snapper_config script
-SNAPPER_CONFIG=/etc/sysconfig/snapper
+SNAPPER_CONFIG=/etc/conf.d/snapper
 
 TMPDIR=$(mktemp -d)
 PIPE=$TMPDIR/$name.out
@@ -106,13 +106,13 @@ Options:
                           configuration. Can list multiple configurations within quotes, space-separated
                           (e.g. -c "root home").
  -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
-                          directory name on first backup"
- -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt."
-                          If multiple mount points are found with the same UUID, will prompt user."
+                          directory name on first backup.
+ -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
+                          If multiple mount points are found with the same UUID, will prompt user.
+ -s, --subvolid <subvlid> Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
  --remote <address>       Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You 
                           should specify the remote machine's hostname or ip address. The 'root' user must be 
                           permitted to login on the remote machine.
-
 EOF
 }
 
@@ -131,6 +131,10 @@ while [[ $# -gt 0 ]]; do
         ;;
         -u|--UUID)
             uuid_cmdline="$2"
+            shift 2
+        ;;
+        -s|--subvolid)
+            subvolid_cmdline="$2"
             shift 2
         ;;
         -n|--noconfirm)
@@ -157,13 +161,14 @@ done
 
 description=${description:-"latest incremental backup"}
 uuid_cmdline=${uuid_cmdline:-"none"}
+subvolid_cmdline=${subvolid_cmdline:-"5"}
 noconfirm=${noconfirm:-"no"}
 
 if [[ "$uuid_cmdline" != "none" ]]; then
     if [[ -z $ssh ]]; then
-        notify_info "Backup started" "Starting backups to $uuid_cmdline..."
+        notify_info "Backup started" "Starting backups to $uuid_cmdline subvolid=$subvolid_cmdline..."
     else
-        notify_info "Backup started" "Starting backups to $uuid_cmdline at $remote..."
+        notify_info "Backup started" "Starting backups to $uuid_cmdline subvolid $subvolid_cmdline at $remote..."
     fi
 else
     if [[ -z $ssh ]]; then
@@ -184,22 +189,24 @@ fi
 
 declare -a TARGETS_ARRAY
 declare -a UUIDS_ARRAY
+declare -a SUBVOLIDS_ARRAY
+
+i=0
+for x in $TARGETS; do
+    SUBVOLIDS_ARRAY[$i]=$(btrfs subvolume show $x | awk '/Subvolume ID:/ { print $3 }')
+    TARGETS_ARRAY[$i]=$x
+    i=$((i+1))
+done
 
 i=0
 disk=-1
 disk_count=0
 for x in $UUIDS; do
     UUIDS_ARRAY[$i]=$x
-    if [[ "$x" == "$uuid_cmdline" ]]; then
+    if [[ "$x" == "$uuid_cmdline" && ${SUBVOLIDS_ARRAY[$((i))]} == "$subvolid_cmdline" ]]; then
         disk=$i
         disk_count=$(($disk_count+1))
     fi
-    i=$((i+1))
-done
-
-i=0
-for x in $TARGETS; do
-    TARGETS_ARRAY[$i]=$x
     i=$((i+1))
 done
 
@@ -208,13 +215,13 @@ if [[ "${#UUIDS_ARRAY[$@]}" -eq 0 ]]; then
 fi
 
 if [[ "$disk_count" > 1 ]]; then
-    printf "Multiple mount points were found with UUID %s.\n" "$uuid_cmdline"
+    printf "Multiple mount points were found with UUID %s and subvolid %s.\n" "$uuid_cmdline" "$subvolid_cmdline"
     disk="-1"
 fi
 
 if [[ "$disk" == -1 ]]; then
     if [[ "$disk_count" == 0 && "$uuid_cmdline" != "none" ]]; then
-        error "A device with UUID $uuid_cmdline was not found to be mounted, or it is not a BTRFS device."
+        error "A device with UUID $uuid_cmdline and subvolid $subvolid_cmdline was not found to be mounted, or it is not a BTRFS device."
     fi
     if [[ -z $ssh ]]; then
         printf "Select a mounted BTRFS device on your local machine to backup to.\n"
@@ -223,7 +230,7 @@ if [[ "$disk" == -1 ]]; then
     fi
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
         for x in "${!TARGETS_ARRAY[@]}"; do
-            printf "%4s) %s (%s)\n" "$((x+1))" "${UUIDS_ARRAY[$x]}" "${TARGETS_ARRAY[$x]}"
+            printf "%4s) %s (uuid=%s, subvolid=%s)\n" "$((x+1))" "${TARGETS_ARRAY[$x]}" "${UUIDS_ARRAY[$x]}" "${SUBVOLIDS_ARRAY[$x]}"
         done
         printf "%4s) Exit\n" "0"
         read -r -p "Enter a number: " disk
@@ -238,9 +245,10 @@ if [[ "$disk" == -1 ]]; then
     disk=$(($disk-1))
 fi
 
+selected_subvolid="${SUBVOLIDS_ARRAY[$((disk))]}"
 selected_uuid="${UUIDS_ARRAY[$((disk))]}"
 selected_mnt="${TARGETS_ARRAY[$((disk))]}"
-printf "\nYou selected the disk with UUID %s.\n" "$selected_uuid" | tee $PIPE
+printf "\nYou selected the disk with UUID %s, subovolid=%s.\n" "$selected_uuid" "$selected_subvolid" | tee $PIPE
 if [[ -z $ssh ]]; then
     printf "The disk is mounted at %s.\n" "$selected_mnt" | tee $PIPE
 else
@@ -267,8 +275,8 @@ printf "\nInitial configuration...\n" | tee $PIPE
 i=0
 for x in $selected_configs; do
 
-    if [[ "$(snapper -c $x list -t single | awk '/'"$selected_uuid"'/ {cnt++} END {print cnt}')" -gt 1 ]]; then
-        error "More than one snapper entry found with UUID $selected_uuid for configuration $x. Skipping configuration $x."
+    if [[ "$(snapper -c $x list -t single | awk '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {cnt++} END {print cnt}')" -gt 1 ]]; then
+        error "More than one snapper entry found with UUID $selected_uuid subvolid $selected_subvolid for configuration $x. Skipping configuration $x."
         continue
     fi
 
@@ -304,7 +312,7 @@ for x in $selected_configs; do
 
     printf "\n"
 
-    old_num=$(snapper -c "$x" list -t single | awk '/'"$selected_uuid"'/ {print $1}')
+    old_num=$(snapper -c "$x" list -t single | awk '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {print $1}')
     old_snap=$SUBVOLUME/.snapshots/$old_num/snapshot
 
     OLD_NUM_ARRAY[$i]=$old_num
@@ -312,12 +320,12 @@ for x in $selected_configs; do
 
     if [[ -z "$old_num" ]]; then
         printf "No backups have been performed for '%s' on this disk.\n" "$x"
-        read -r -p "Enter name of directory to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
+        read -r -p "Enter name of subvolume to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
         printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
         BACKUPDIR="$selected_mnt/$mybackupdir"
-        $ssh mkdir -p -m700 "$BACKUPDIR"
+        $ssh subvolume create "$BACKUPDIR"
     else
-        mybackupdir=$(snapper -c "$x" list -t single | awk -F"|" '/'"$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
+        mybackupdir=$(snapper -c "$x" list -t single | awk -F"|" '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
         $ssh test -d $BACKUPDIR || die "%s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid"
     fi
@@ -417,7 +425,7 @@ for x in $selected_configs; do
         # location where it can get its data. This helps speed up the transfer.
         btrfs send -c "$old_snap" "$new_snap" | $ssh btrfs receive "$backup_location"
         printf "Modifying data for old snapshot for %s...\n" "$x" | tee $PIPE
-        snapper -v -c "$x" modify -d "old snap-sync snapshot (you may remove)" -u "backupdir=,uuid=" -c "number" "$old_num"
+        snapper -v -c "$x" modify -d "old snap-sync snapshot (you may remove)" -u "backupdir=,subvolid=,uuid=" -c "number" "$old_num"
     fi
 
     if [[ -z $ssh ]]; then
@@ -429,7 +437,7 @@ for x in $selected_configs; do
     # It's important not to change this userdata in the snapshots, since that's how
     # we find the previous one.
 
-    userdata="backupdir=$mybackupdir, uuid=$selected_uuid"
+    userdata="backupdir=$mybackupdir, subvolid=$selected_subvolid, uuid=$selected_uuid"
 
     # Tag new snapshot as the latest
     printf "Tagging new snapshot as latest backup for %s...\n" "$x" | tee $PIPE
