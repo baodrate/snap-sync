@@ -114,6 +114,34 @@ This is essentially what the systemd service does.
 
     Done!
 
+## systemd example
+
+## service
+
+    [Unit]
+    Description=Run snap-sync backup 
+
+    [Install]
+    WantedBy=multi-user.target
+
+    [Service]
+    Type=simple
+    ExecStart=/usr/bin/snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
+
+## timer
+
+    [Unit]
+    Description=Run snap-sync weekly
+
+    [Timer]
+    OnCalendar=weekly
+    AccuracySec=12h
+    Persistent=true
+
+    [Install]
+    WantedBy=timers.target
+
+
 ## Contributing
 
 Help wanted! Feel free to fork and issue a pull request to add features or
