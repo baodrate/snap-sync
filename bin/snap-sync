@@ -272,7 +272,7 @@ run_config () {
     # Pseudo Arrays $i -> store associated elements of selected_config
     i=0
     for selected_config in $selected_configs; do
-	count=$(eval snapper -c $selected_config list -t single | awk '/uuid='"$selected_uuid"'/, /subvolid'="$selected_subvol"'/ {cnt++} END {print cnt}')
+	count=$(eval snapper -c $selected_config list -t single | awk '/subvolid='"$selected_subvol"'/, /uuid='"$selected_uuid"'/ {cnt++} END {print cnt}')
 	#count=$(eval snapper -c $selected_config list -t single | grep -c -e "subvolid=$selected_subvol" -e 'uuid=$selected_uuid')
 	if [ -n "$count" ] && [ "$count" -gt 1 ]; then
 	    error "More than one snapper entry found with UUID $selected_uuid and SUBVOL $selected_subvol for configuration '$selected_config'. Skipping configuration '$selected_config'."
@@ -338,7 +338,7 @@ run_config () {
 
 	# processed snapshot backup is marked with userdata key/value pairs
 	# backupdir, uuid
-	snapper_sync_id=$(eval snapper -c "$selected_config" list -t single | awk '/uuid='"$selected_uuid"'/ {print $1}')
+	snapper_sync_id=$(eval snapper -c "$selected_config" list -t single | awk  '/subvolid='"$selected_subvol"'/, /uuid='"$selected_uuid"'/ {print $1}')
 	if [ ${#snapper_sync_id} -gt 0 ]; then
 	    snapper_sync_snapshot=$SUBVOLUME/.snapshots/$snapper_sync_id/snapshot
 	fi
