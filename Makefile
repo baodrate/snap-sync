@@ -18,6 +18,7 @@
 PKGNAME = snap-sync
 PREFIX ?= /usr
 SNAPPER_CONFIG ?= /etc/sysconfig/snapper
+SNAPPER_TEMPLATES ?= /etc/snapper/config-templates
 
 BIN_DIR = $(DESTDIR)$(PREFIX)/bin
 SYSTEMD_DIR = $(DESTDIR)$(PREFIX)/lib/systemd/system
@@ -27,3 +28,4 @@ SYSTEMD_DIR = $(DESTDIR)$(PREFIX)/lib/systemd/system
 install:
 	@./find_snapper_config || sed -i 's@^SNAPPER_CONFIG.*@SNAPPER_CONFIG='$(SNAPPER_CONFIG)'@g' bin/$(PKGNAME)
 	@install -Dm755 bin/* -t $(BIN_DIR)/
+	@install -Dm644 ./$(SNAPPER_TEMPLATES)/* -t $(SNAPPER_TEMPLATES)/
