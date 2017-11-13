@@ -2,6 +2,7 @@
 
 ## open tasks ##
 
+- snap-sync: use snapper to administer target synced snapshots
 - snap-sync: introduce snapper function: important snapshots
   Important snapshots have important=yes in the userdata
 
@@ -9,4 +10,5 @@
 
 - snap-sync: refine paramteter parsing
 - snap-sync: refine functions structure
-- snap-sync: rport as posix compatible
+- snap-sync: port as posix compatible
+- snap-sync: introduce selectable subvolid option
