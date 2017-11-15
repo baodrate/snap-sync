@@ -40,6 +40,8 @@ systemd-cat -t "$progname" < $PIPE &
 exec 3>$PIPE
 
 # global variables
+donotify=0
+answer=no
 disk_count=-1
 disk_uuid_match_count=0
 disk_target_match_count=0
@@ -71,6 +73,19 @@ check_prerequisites () {
 
     if [ ! -r "$SNAPPER_CONFIG" ]; then
 	die "$SNAPPER_CONFIG does not exist."
+    fi
+}
+
+check_snapper_failed_ids () {
+    # active, non finished snapshot backups are marked with following string
+    # "$progname backup in progress" (snapper description field)
+    snapper_failed_ids=$(eval snapper -c $selected_config list -t single | awk '/'"$progname"' backup in progress/ {cnt++} END {print cnt}')
+    if [ -n "$snapper_failed_ids" ]; then
+        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$progname" "$selected_config" | tee $PIPE
+	get_answer_yes_no "Delete failed backup snapshots [y/N]? " "no"
+	if [ "$answer" = "yes" ]; then
+	    snapper -c $selected_config delete $(snapper -c $selected_config list | awk '/'"$progname"' backup in progress/ {print $3}')
+	fi
     fi
 }
 
@@ -149,6 +164,32 @@ get_disk_infos () {
 	eval "fs_options_$i='$fs_option'"
 	i=$((i+1))
     done
+}
+
+get_answer_yes_no () {
+    local message="${1:-'Do you want to proceed [y/N]? '}"
+    local i="none"
+
+    #printf "Pre-selected answer: %s\n" $answer
+    while [ "$i" = "none" ]; do
+	read -r -p "$message" i
+
+	case $i in
+	    y|Y|yes|Yes)
+		answer="yes"
+		break
+		;;
+	    n|N|no|No)
+		answer="no"
+		break
+		;;
+	    *)
+		i="none"
+		printf "Select 'y' or 'n'.\n"
+		;;
+	esac
+    done
+    #printf "Selected answer: %s\n" $answer
 }
 
 notify () {
@@ -312,45 +353,11 @@ run_config () {
 	    fi
 	    continue
 	fi
-	# active, non finished snapshot backups are marked with following string
-	# "$progname backup in progress" (snapper description field)
-	snapper_failed_ids=$(eval snapper -c $selected_config list -t single | awk '/'"$progname"' backup in progress/ {cnt++} END {print cnt}')
-	if [ -n "$snapper_failed_ids" ]; then
-            printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$progname" "$selected_config" | tee $PIPE
-            read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
-	    #get_answer_yes_no
-            while [ -n "$delete_failed" ] &&
-		      [ "$delete_failed" != "Yes" ] &&
-		      [ "$delete_failed" != "yes" ] &&
-		      [ "$delete_failed" != "Y" ] &&
-		      [ "$delete_failed" != "y" ] &&
-		      [ "$delete_failed" != "No" ] &&
-		      [ "$delete_failed" != "no" ] &&
-		      [ "$delete_failed" != "N" ] &&
-		      [ "$delete_failed" != "n" ]; do
-		read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
-		if [ -n "$delete_failed" ] &&
-		       [ "$delete_failed" != "Yes" ] &&
-		       [ "$delete_failed" != "yes" ] &&
-		       [ "$delete_failed" != "Y" ] &&
-		       [ "$delete_failed" != "y" ] &&
-		       [ "$delete_failed" != "No" ] &&
-		       [ "$delete_failed" != "no" ] &&
-		       [ "$delete_failed" != "N" ] &&
-		       [ "$delete_failed" != "n" ]; then
-		    printf "Select 'y' or 'N'.\n"
-		fi
-	    done
-	    if [ "$delete_failed" = "Yes" ] ||
-		   [ "$delete_failed" = "yes" ]	||
-		   [ "$delete_failed" = "Y" ] ||
-		   [ "$delete_failed" = "y" ]; then
-		snapper -c $selected_config delete $(snapper -c $selected_config list | awk '/'"$progname"' backup in progress/ {print $3}')
-	    fi
-	fi
+
+	# cleanup failed former runs
+	check_snapper_failed_ids cleanup
 
 	SNAP_SYNC_EXCLUDE=no
-
 	if [ -f "/etc/snapper/configs/$selected_config" ]; then
 	    . /etc/snapper/configs/$selected_config
 	    if [ "$SUBVOLUME" = "/" ]; then
@@ -452,40 +459,13 @@ run_config () {
 	if [ $noconfirm ]; then
 	    cont_backup="yes"
 	else
-            while [ -n "$cont_backup" ] &&
-		      [ "$cont_backup" != "Yes" ] &&
-		      [ "$cont_backup" != "yes" ] &&
-		      [ "$cont_backup" != "Y" ] &&
-		      [ "$cont_backup" != "y" ] &&
-		      [ "$cont_backup" != "No" ] &&
-		      [ "$cont_backup" != "no" ] &&
-		      [ "$cont_backup" != "N" ] &&
-		      [ "$cont_backup" != "n" ]; do
-		read -r -p "Continue with backup [Y/n]? " cont_backup
-		if [ -n "$cont_backup" ] &&
-		       [ "$cont_backup" != "Yes" ] &&
-		       [ "$cont_backup" != "yes" ] &&
-		       [ "$cont_backup" != "Y" ] &&
-		       [ "$cont_backup" != "y" ] &&
-		       [ "$cont_backup" != "No" ] &&
-		       [ "$cont_backup" != "no" ] &&
-		       [ "$cont_backup" != "N" ] &&
-		       [ "$cont_backup" != "n" ]; then
-		    printf "Select 'Y' or 'n'.\n"
-		fi
-	    done
+	    get_answer_yes_no "Continue with backup [Y/n]? " "yes"
+	    if [ "$answer" = "no" ]; then
+		eval "snapper_activate_$i=no"
+		printf "Aborting backup for this configuration.\n"
+		snapper -c $selected_config delete $snapper_new_id
+	    fi
 	fi
-
-	if [ "$cont_backup" != "Yes" ] &&
-	       [ "$cont_backup" != "yes" ] &&
-	       [ "$cont_backup" != "Y" ] &&
-	       [ "$cont_backup" != "y" ] &&
-	       [ -n "$cont_backup" ]; then
-	    eval "snapper_activate_$i=no"
-	    printf "Aborting backup for this configuration.\n"
-	    snapper -c $selected_config delete $snapper_new_id
-	fi
-
 	i=$(($i+1))
 
     done
@@ -601,7 +581,7 @@ run_backup () {
 	# Tag new snapshot as the latest
 	printf "Tagging snapper metadata for configuration '%s' ...\n" "$selected_config" | tee $PIPE
 	if [ ! "$dryrun" ]; then
-	    snapper -v -c "$selected_config" modify -d "$description" -u "$userdata" "$snapper_new_id"
+	    snapper -v -c "$selected_config" modify -d \"$description\" -u \"$userdata\" "$snapper_new_id"
 	    $ssh snapper -v -c "$snapper_target_subvol" modify -d \"$target_description\" -u \"$target_userdata\" "$snapper_new_id"
 	else
 	    cmd="snapper -v -c $selected_config modify -d $description -u $userdata $snapper_new_id"
