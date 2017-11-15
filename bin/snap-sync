@@ -647,7 +647,7 @@ select_target_disk () {
 		eval "disk_selected_$i='$disk_uuid'"
 		disk=$(eval echo \$disk_uuid_$disk_uuid)
 		fs_options=$(eval echo \$fs_options_$disk_uuid | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
-		printf "%4s) %s %s (%s)\n" "$i" "$disk" "$target" "$fs_options"
+		printf "%4s) %s (uuid=%s,%s)\n" "$i" "$target" "$disk" "$fs_options"
 		i=$((i+1))
 	    done
 	else
@@ -658,7 +658,7 @@ select_target_disk () {
 		disk=$(eval echo \$disk_uuid_$disk_id)
 		target=$(eval echo \$disk_target_$disk_id)
 		fs_options=$(eval echo \$fs_options_$disk_id | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
-		printf "%4s) %s %s (%s)\n" "$disk_id" "$disk" "$target" "$fs_options"
+		printf "%4s) %s (uuid=%s,%s)\n" "$i" "$target" "$disk" "$fs_options"
 		i=$((i+1))
 		disk_id=$(($disk_id+1))
 	    done
