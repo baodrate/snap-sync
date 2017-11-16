@@ -42,6 +42,7 @@ exec 3>$PIPE
 disk_count=-1
 disk_uuid_match_count=0
 disk_target_match_count=0
+disk_subvolid_match_count=0
 disk_uuid_match=''
 selected_uuid='none'
 selected_target='none'
@@ -100,7 +101,7 @@ get_disk_infos () {
     # we need at least one target disk
     if [ ${#disk_targets} -eq 0 ]; then die "no suitable target disk found \n"die
     fi
-    
+
     # Posix Shells do not support Array. Therefore using ...
     # Pseudo-Arrays (assumption: equal number of members)
     # Pseudo-Array: disk_uuid_$i
@@ -137,6 +138,12 @@ get_disk_infos () {
     i=0
     for fs_option in $fs_options; do
 	eval "fs_options_$i='$fs_option'"
+	subvolid=$(eval echo \$fs_options | sed -e 's/.*subvolid=\([0-9]*\).*/\1/')
+	if [ "$subvolid" = "$subvolid_cmdline" ]; then
+	    disk_subvolid_match="$i"
+            disk_subvolid_match_count=$(($disk_subvolid_match_count+1))
+	fi
+	eval "disk_target_$i='$disk_target'"
 	i=$((i+1))
     done
 }
@@ -194,6 +201,10 @@ parse_params () {
 		nonotify=1
 		shift
 		;;
+            -s|--subvolid|--SUBVOLID)
+		subvolid_cmdline="$2"
+		shift 2
+		;;
             -u|--UUID)
 		uuid_cmdline="$2"
 		shift 2
@@ -211,6 +222,10 @@ parse_params () {
 		ssh="ssh $remote"
 		shift 2
 		;;
+	    --subvolid=*|--SUBVOLID=*)
+                subvolid_cmdline=${1#*=}
+                shift
+                ;;
 	    --TARGET=*)
                 target_cmdline=${1#*=}
                 shift
@@ -558,7 +573,7 @@ run_backup () {
 	# which is stored in snappers info.xml file of the source snapshot.
 	# This is how we find the parent.
 
-	userdata="backupdir=$backup_dir, uuid=$selected_uuid, subvolid=$selected_subvol"
+	userdata="backupdir=$backup_dir, subvolid=$selected_subvol, uuid=$selected_uuid"
 
 	# Tag new snapshot as the latest
 	printf "Tagging new snapshot as latest backup for '%s' ...\n" "$selected_config" | tee $PIPE
@@ -590,6 +605,16 @@ select_target_disk () {
         printf "Selecting a mounted BTRFS device for backups on %s.\n" "$remote"
     fi
     while [ "$disk_id" -eq -1 ] || [ "$disk_id" -le $disk_count ]; do
+	if [ "$disk_subvolid_match_count" -eq 1 ]; then
+	    # matching SUBVOLID selection from commandline
+	    # Pseudo-Array: disk_selected_$i (reference to $disk_uuid element)
+	    eval "disk_selected_$i='$disk_subvolid_match'"
+	    disk=$(eval echo \$disk_uuid_$disk_subvolid_match)
+	    subvolid=$(eval echo \$disk_subvolid_$disk_subvolid_match)
+	    fs_options=$(eval echo \$fs_options_$disk_target_match | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
+	    disk_selected=$disk_subvolid_match
+	    break
+	fi
 	if [ "$disk_target_match_count" -eq 1 ]; then
 	    # matching TARGET selection from commandline
 	    # Pseudo-Array: disk_selected_$i (reference to $disk_uuid element)
@@ -689,8 +714,8 @@ Options:
  -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt."
                           If multiple mount points are found with the same UUID, will prompt user."
  -l, --TARGET <target>    Specify the mountpoint of the BTRFS subvolume to back up to.
-     --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You 
-                          should specify the remote machine's hostname or ip address. The 'root' user must be 
+     --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
+                          should specify the remote machine's hostname or ip address. The 'root' user must be
                           permitted to login on the remote machine.
      --dry-run            perform a trial run where no changes are made.
  -v, --verbose            Be more verbose on what's going on.
