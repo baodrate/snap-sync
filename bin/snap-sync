@@ -438,12 +438,12 @@ run_config () {
 
 	# if we want to use snapper on the target to supervise the synced snapshots
 	# the backup_location needs to be in a subvol ".snapshots" inside $selected_config (hardcoded in snapper)
-	snapper_target_subvol="snap-$selected_config"
-	snapper_target_snapshots=$backup_root/$snapper_target_subvol/.snapshots/$snapper_new_id
+	snapper_target_config="snap-$selected_config"
+	snapper_target_snapshot=$backup_root/$snapper_target_config/.snapshots/$snapper_new_id
 	if [ -z "$ssh" ]; then
-	    printf "Will backup %s to %s\n" "$snapper_new_snapshot" "$snapper_target_snapshots/snapshot" | tee $PIPE
+	    printf "Will backup %s to %s\n" "$snapper_new_snapshot" "$snapper_target_snapshot/snapshot" | tee $PIPE
 	else
-	    printf "Will backup %s to %s\n" "$snapper_new_snapshot" "$remote":"$snapper_target_snapshots/snapshot" | tee $PIPE
+	    printf "Will backup %s to %s\n" "$snapper_new_snapshot" "$remote":"$snapper_target_snapshot/snapshot" | tee $PIPE
 	fi
 
 	# save in config specific infos in pseudo Arrays
@@ -451,8 +451,8 @@ run_config () {
 	eval "snapper_new_snapshot_$i='$snapper_new_snapshot'"
 	eval "snapper_new_info_$i='$snapper_new_info'"
 	eval "snapper_config_$i='$selected_config'"
-	eval "snapper_target_subvol_$i='$snapper_target_subvol'"
-	eval "snapper_target_snapshots_$i='$snapper_target_snapshots'"
+	eval "snapper_target_config_$i='$snapper_target_config'"
+	eval "snapper_target_snapshot_$i='$snapper_target_snapshot'"
 
 	cont_backup="K"
 	eval "snapper_activate_$i=yes"
@@ -507,27 +507,27 @@ run_backup () {
 	snapper_sync_snapshot=$(eval echo \$snapper_sync_snapshot_$i)
 	snapper_new_snapshot=$(eval echo \$snapper_new_snapshot_$i)
 	snapper_new_info=$(eval echo \$snapper_new_info_$i)
-	snapper_target_subvol=$(eval echo \$snapper_target_subvol_$i)
-	snapper_target_snapshots=$(eval echo \$snapper_target_snapshots_$i)
+	snapper_target_config=$(eval echo \$snapper_target_config_$i)
+	snapper_target_snapshot=$(eval echo \$snapper_target_snapshot_$i)
 
 	if [ ! "$dryrun" ]; then
-	    verify_snapper_structure $backup_root $snapper_config $snapper_target_subvol $snapper_new_id
+	    verify_snapper_structure $backup_root $snapper_config $snapper_target_config $snapper_new_id
 	else
-	    cmd="verify_snapper_structure $backup_root $snapper_config $snapper_target_subvol $snapper_new_id"
+	    cmd="verify_snapper_structure $backup_root $snapper_config $snapper_target_config $snapper_new_id"
 	    printf "dryrun: %s\n" "$cmd"
 	fi
 
 	if [ -z "$snapper_sync_id" ]; then
-	    cmd="btrfs send $snapper_new_snapshot | $ssh btrfs receive $snapper_target_snapshots"
+	    cmd="btrfs send $snapper_new_snapshot | $ssh btrfs receive $snapper_target_snapshot"
             printf "Sending first snapshot for snapper config '%s' ...\n" "$selected_config" | tee $PIPE
             if [ "$verbose" ]; then
-		printf "btrfs send %s | %s btrfs receive %s\n" "$snapper_new_snapshot" "$ssh" "$snapper_target_snapshots"
-		cmd="btrfs send -v $snapper_new_snapshot | $ssh btrfs receive -v $snapper_target_snapshots"
+		printf "btrfs send %s | %s btrfs receive %s\n" "$snapper_new_snapshot" "$ssh" "$snapper_target_snapshot"
+		cmd="btrfs send -v $snapper_new_snapshot | $ssh btrfs receive -v $snapper_target_snapshot"
 	    fi
 	    if [ ! "$dryrun" ]; then
-	       btrfs send "$snapper_new_snapshot" | $ssh btrfs receive "$snapper_target_snapshots" &>/dev/null
+	       btrfs send "$snapper_new_snapshot" | $ssh btrfs receive "$snapper_target_snapshot" &>/dev/null
 	    else
-	       cmd="btrfs send -v $snapper_new_snapshot | $ssh btrfs receive -v $snapper_target_snapshots"
+	       cmd="btrfs send -v $snapper_new_snapshot | $ssh btrfs receive -v $snapper_target_snapshot"
 	       printf "dryrun: %s\n" "$cmd"
 	    fi
 	else
@@ -538,7 +538,7 @@ run_backup () {
             # location where it can get its data. This helps speed up the transfer.
 	    verbose_flag="-v"
 	    if [ ! "$dryrun" ]; then
-               btrfs send "$verbose_flag" -c "$snapper_sync_snapshot" "$snapper_new_snapshot" | $ssh btrfs receive "$verbose_flag" "$snapper_target_snapshots"
+               btrfs send "$verbose_flag" -c "$snapper_sync_snapshot" "$snapper_new_snapshot" | $ssh btrfs receive "$verbose_flag" "$snapper_target_snapshot"
                if [ "$verbose" ]; then
 		   printf "Deleting sync snapshot for %s ...\n" "$selected_config" | tee $PIPE
 	       fi
@@ -546,23 +546,23 @@ run_backup () {
 	    else
 	       printf "dryrun: btrfs send %s -c %s  %s | %s btrfs receive %s %s\n" \
 		       "$verbose_flag" "$snapper_sync_snapshot" "$snapper_new_snapshot" \
-		       "$ssh" "$verbose_flag" "$snapper_target_snapshots"
+		       "$ssh" "$verbose_flag" "$snapper_target_snapshot"
 	       printf "dryrun: snapper --config %s delete %s\n" "$selected_config" "$snapper_sync_id"
 	    fi
 	fi
 
 	if [ -z "$ssh" ]; then
 	    if [ ! "$dryrun" ]; then
-		cp "$snapper_new_info" "$snapper_target_snapshots"
+		cp "$snapper_new_info" "$snapper_target_snapshot"
 	    else
-               cmd="cp $snapper_new_info $snapper_target_snapshots"
+               cmd="cp $snapper_new_info $snapper_target_snapshot"
 	       printf "dryrun: %s\n" "$cmd"
 	    fi
 	else
 	    if [ ! "$dryrun" ]; then
-		rsync -avzq "$snapper_new_info" "$remote":"$snapper_target_snapshots"
+		rsync -avzq "$snapper_new_info" "$remote":"$snapper_target_snapshot"
 	    else
-		cmd="rsync -avzq $snapper_new_info $remote:$snapper_target_snapshots"
+		cmd="rsync -avzq $snapper_new_info $remote:$snapper_target_snapshot"
 		printf "dryrun: %s\n" "$cmd"
 	    fi
 	fi
@@ -582,11 +582,11 @@ run_backup () {
 	printf "Tagging snapper metadata for configuration '%s' ...\n" "$selected_config" | tee $PIPE
 	if [ ! "$dryrun" ]; then
 	    snapper -v -c "$selected_config" modify -d \"$description\" -u \"$userdata\" "$snapper_new_id"
-	    $ssh snapper -v -c "$snapper_target_subvol" modify -d \"$target_description\" -u \"$target_userdata\" "$snapper_new_id"
+	    $ssh snapper -v -c "$snapper_target_config" modify -d \"$target_description\" -u \"$target_userdata\" "$snapper_new_id"
 	else
 	    cmd="snapper -v -c $selected_config modify -d $description -u $userdata $snapper_new_id"
 	    printf "dryrun: %s\n" "$cmd"
-	    cmd="$ssh snapper -v -c $snapper_target_subvol modify -d $target_description -u $target_userdata $snapper_new_id"
+	    cmd="$ssh snapper -v -c $snapper_target_config modify -d $target_description -u $target_userdata $snapper_new_id"
 	    printf "dryrun: %s\n" "$cmd"
 	fi
 
