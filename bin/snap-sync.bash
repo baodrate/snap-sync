@@ -34,9 +34,9 @@ name="snap-sync"
 SNAPPER_CONFIG=/etc/conf.d/snapper
 
 TMPDIR=$(mktemp -d)
-PIPE=$TMPDIR/$name.out
+PIPE=$TMPDIR/$progname.out
 mkfifo $PIPE
-systemd-cat -t "$name" < $PIPE &
+systemd-cat -t "$progname" < $PIPE &
 exec 3>$PIPE
 
 donotify=0
@@ -49,7 +49,7 @@ notify() {
     for u in $(users | sed 's/ /\n/' | sort -u); do
         sudo -u $u DISPLAY=:0 \
         DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
-        notify-send -a $name "$1" "$2" --icon="dialog-$3"
+        notify-send -a $progname "$1" "$2" --icon="dialog-$3"
     done
 }
 
@@ -69,12 +69,12 @@ notify_error() {
     fi
 }
 
-error() { 
+error() {
     printf "==> ERROR: %s\n" "$@"
     notify_error 'Error' 'Check journal for more information.'
 } >&2
 
-die() { 
+die() {
     error "$@"
     exit 1
 }
@@ -84,21 +84,21 @@ traperror() {
     printf "exit status: %s\n" "$2"
     printf "command: %s\n" "$3"
     printf "bash line: %s\n" "$4"
-    printf "function name: %s\n" "$5"
+    printf "function progname: %s\n" "$5"
     exit 1
 }
 
-trapkill() { 
-    die "Exited due to user intervention." 
+trapkill() {
+    die "Exited due to user intervention."
 }
 
-trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
+trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCPROGNAME[@]}"' ERR
 trap trapkill SIGTERM SIGINT
 
 usage() {
   cat <<EOF
-$name $version
-Usage: $name [options]
+$progname $version
+Usage: $progname [options]
 
 Options:
  -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
@@ -110,7 +110,7 @@ Options:
  -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
                           If multiple mount points are found with the same UUID, will prompt user.
  -s, --subvolid <subvlid> Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
- --remote <address>       Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You 
+     --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You 
                           should specify the remote machine's hostname or ip address. The 'root' user must be 
                           permitted to login on the remote machine.
 EOF
@@ -151,12 +151,12 @@ while [[ $# -gt 0 ]]; do
             shift 2
 	    ;;
         *)
-            die "Unknown option: $key\nRun '$name -h' for valid options.\n"
+            die "Unknown option: $key\nRun '$progname -h' for valid options.\n"
         ;;
     esac
 done
 
-[[ $EUID -ne 0 ]] && die "Script must be run as root." 
+[[ $EUID -ne 0 ]] && die "Script must be run as root."
 ! [[ -f $SNAPPER_CONFIG ]] && die "$SNAPPER_CONFIG does not exist."
 
 description=${description:-"latest incremental backup"}
@@ -280,8 +280,8 @@ for x in $selected_configs; do
         continue
     fi
 
-    if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
-        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x" | tee $PIPE
+    if [[ "$(snapper -c $x list -t single | awk '/'$progname' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
+        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$progname" "$x" | tee $PIPE
         read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
         while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
             "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
@@ -294,7 +294,7 @@ for x in $selected_configs; do
             fi
         done
         if [[ "$delete_failed" == [Yy]"es" || "$delete_failed" == [Yy] ]]; then
-            snapper -c $x delete $(snapper -c $x list | awk '/'$name' backup in progress/ {print $3}')
+            snapper -c $x delete $(snapper -c $x list | awk '/'$progname' backup in progress/ {print $3}')
         fi
     fi
 
@@ -306,7 +306,7 @@ for x in $selected_configs; do
         die "Selected snapper configuration $x does not exist."
     fi
 
-    if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
+    if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then
         continue
     fi
 
@@ -333,7 +333,7 @@ for x in $selected_configs; do
     MYBACKUPDIR_ARRAY[$i]="$mybackupdir"
 
     printf "Creating new snapshot for %s...\n" "$x" | tee $PIPE
-    new_num=$(snapper -c "$x" create --print-number -d "$name backup in progress")
+    new_num=$(snapper -c "$x" create --print-number -d "$progname backup in progress")
     new_snap=$SUBVOLUME/.snapshots/$new_num/snapshot
     new_info=$SUBVOLUME/.snapshots/$new_num/info.xml
     sync
@@ -392,7 +392,7 @@ for x in $selected_configs; do
     fi
 
     cont_backup=${CONT_BACKUP_ARRAY[$i]}
-    if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
+    if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then
         notify_info "Backup in progress" "NOTE: Skipping $x configuration."
         continue
     fi
@@ -413,12 +413,12 @@ for x in $selected_configs; do
     $ssh mkdir -p $backup_location
 
     if [[ -z "$old_num" ]]; then
-        printf "Sending first snapshot for %s...\n" "$x" | tee $PIPE  
+        printf "Sending first snapshot for %s...\n" "$x" | tee $PIPE
         btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &>/dev/null
 
     else
 
-        printf "Sending incremental snapshot for %s...\n" "$x" | tee $PIPE  
+        printf "Sending incremental snapshot for %s...\n" "$x" | tee $PIPE
         # Sends the difference between the new snapshot and old snapshot to the
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
