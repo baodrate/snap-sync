@@ -27,4 +27,3 @@ SYSTEMD_DIR = $(DESTDIR)$(PREFIX)/lib/systemd/system
 install:
 	@./find_snapper_config || sed -i 's@^SNAPPER_CONFIG.*@SNAPPER_CONFIG='$(SNAPPER_CONFIG)'@g' bin/$(PKGNAME)
 	@install -Dm755 bin/* -t $(BIN_DIR)/
-	@install -Dm644 systemd/* -t $(SYSTEMD_DIR)/
