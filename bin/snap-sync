@@ -580,6 +580,47 @@ run_backup () {
 		printf "dryrun: %s\n" "$cmd"
 	    fi
 	fi
+    done
+}
+
+run_finalize () {
+    # Actual backing up
+    printf "\nFinalize backups...\n" | tee $PIPE
+
+    i=-1
+    for selected_config in $selected_configs; do
+
+	i=$(($i+1))
+
+	SNAP_SYNC_EXCLUDE=no
+
+	if [ -f "/etc/snapper/configs/$selected_config" ]; then
+            . /etc/snapper/configs/$selected_config
+	else
+            die "Selected snapper configuration '$selected_config' does not exist."
+	fi
+
+	cont_backup=$(eval echo \$snapper_activate_$i)
+	if [ "$cont_backup" = "no" ] || [ "$SNAP_SYNC_EXCLUDE" = "yes" ]; then
+            notify_info "Finalize backup" "NOTE: Skipping '$selected_config' configuration."
+            continue
+	fi
+
+	notify_info "Finalize backup" "Cleanup tasks for configuration '$selected_config'."
+
+	printf "\n"
+
+	# retrieve config specific infos from pseudo Arrays
+	snapper_config=$(eval echo \$snapper_config_$i)
+	backup_root=$(eval echo \$backup_root_$i)
+	backup_dir=$(eval echo \$backup_dir_$i)
+	snapper_sync_id=$(eval echo \$snapper_sync_id_$i)
+	snapper_new_id=$(eval echo \$snapper_new_id_$i)
+	snapper_sync_snapshot=$(eval echo \$snapper_sync_snapshot_$i)
+	snapper_new_snapshot=$(eval echo \$snapper_new_snapshot_$i)
+	snapper_new_info=$(eval echo \$snapper_new_info_$i)
+	snapper_target_config=$(eval echo \$snapper_target_config_$i)
+	snapper_target_snapshot=$(eval echo \$snapper_target_snapshot_$i)
 
 	# It's important not to change the values of the key/value pairs ($userdata)
 	# which is stored in snappers info.xml file of the source snapshot.
@@ -889,6 +930,9 @@ run_config
 
 # run backups using btrfs-send -> btrfs-receive
 run_backup
+
+# finalize backup tasks
+run_finalize
 
 printf "\nDone!\n" | tee $PIPE
 exec 3>&-
