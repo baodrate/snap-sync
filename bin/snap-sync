@@ -356,13 +356,15 @@ parse_params () {
     fi
 
     if [ "$verbose" ]; then
-	printf "Snap UUID:        '%s'\n" "$uuid_cmdline"
-	printf "Snap TARGET:      '%s'\n" "$target_cmdline"
-	printf "Snap SUBVOLID:    '%s'\n" "$subvolid_cmdline"
-	printf "Snap Backupdir:   '%s'\n" "$backupdir_cmdline"
-	printf "Snap Description: '%s'\n" "$description"
-	printf "Snap Config:      '%s'\n" "$selected_config"
-	printf "Snap Remote:      '%s'\n" "$ssh"
+	printf "$progname (runtime arguments)\n"
+	printf "for backup-source:\n"
+	printf "  selected configs: '%s'\n" "$selected_configs"
+	printf "for backup-target:\n"
+	printf "  disk UUID:        '%s'\n" "$uuid_cmdline"
+	printf "  disk TARGET:      '%s'\n" "$target_cmdline"
+	printf "  disk SUBVOLID:    '%s'\n" "$subvolid_cmdline"
+	printf "  disk Backupdir:   '%s'\n" "$backupdir_cmdline"
+	printf "  remote host:      '%s'\n" "$ssh"
 
 	printf "Snapper Descriptions"
 	printf "  backup finished:  '%s'\n" "$snap_description_finished"
@@ -527,7 +529,8 @@ run_config () {
 
 run_backup () {
     # Actual backing up
-    printf "\nPerforming backups...\n" | tee $PIPE
+    #printf "\nPerforming backups...\n" | tee $PIPE
+    printf "\nPerforming backups...\n"
 
     i=-1
     for selected_config in $selected_configs; do
@@ -865,11 +868,11 @@ select_target_disk () {
     selected_uuid=$(eval echo \$disk_uuid_$disk_selected)
     selected_target=$(eval echo \$disk_target_$disk_selected)
     selected_subvol=$(eval echo \$fs_options_$disk_selected | sed -e 's/.*subvolid=\([0-9]*\).*/\1/')
-    if [ "$verbose" ]; then
-	printf "Selected Subvol-ID=%s: %s on %s\n" "$selected_subvol" "$selected_target"  "$selected_uuid"
-     fi
-
+    if [ "$dryrun" ]; then
+    	printf "Selected Subvol-ID=%s: %s on %s\n" "$selected_subvol" "$selected_target" "$selected_uuid"
+    fi
 }
+
 traperror () {
     printf "Exited due to error on line %s.\n" $1
     printf "exit status: %s\n" "$2"
@@ -1033,7 +1036,7 @@ fi
 # select the target BTRFS subvol
 select_target_disk
 
-printf "\nYou selected the disk with UUID %s.\n" "$selected_uuid" | tee $PIPE
+printf "\nYou selected the disk with UUID %s (subvolid=%s).\n" "$selected_uuid" "$selected_subvol" | tee $PIPE
 if [ -z "$ssh" ]; then
     printf "The disk is mounted at %s.\n" "$selected_target" | tee $PIPE
 else
