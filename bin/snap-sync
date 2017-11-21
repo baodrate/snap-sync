@@ -25,7 +25,7 @@
 # snapshot created on your system since that will be used to determine the
 # difference for the next incremental snapshot.
 
-progname="`basename v$0`"
+progname="${0##*/}"
 version="0.4.4"
 
 # The following lines are modified by the Makefile or
