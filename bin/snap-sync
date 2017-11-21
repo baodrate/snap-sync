@@ -86,18 +86,19 @@ check_prerequisites () {
 }
 
 check_snapper_failed_ids () {
-    local noconfirm=${1:-$false}
+    local batch=${1:-$false}
 
     # active, non finished snapshot backups are marked with following string
     # "$progname backup in progress" (snapper description field)
     snapper_failed_ids=$(eval snapper --config $selected_config list --type single | awk '/'"$snap_description_running"'/ {cnt++} END {print cnt}')
     if [ ${#snapper_failed_ids} -gt 0 ]; then
 	#if [ -n "$snapper_failed_ids" ]; then
-        if [ "$noconfirm" ]; then
+        if [ "$batch" ]; then
 	    answer="yes"
 	else
 	    printf "\nNOTE: Found %s previous failed sync runs for '%s'.\n" "${snapper_failed_ids}" "$selected_config" | tee $PIPE
-	    get_answer_yes_no "Delete failed backup snapshots [y/N]? " "no"
+	    answer=no
+	    get_answer_yes_no "Delete failed backup snapshots [y/N]? " "$answer"
 	fi
 	if [ "$answer" = "yes" ]; then
 	    cmd2="snapper --config \"$selected_config\" list | awk '/'\"$snap_description_running\"'/ {print \$3}'"
@@ -188,7 +189,7 @@ get_answer_yes_no () {
     local message="${1:-'Do you want to proceed [y/N]? '}"
     local i="none"
 
-    #printf "Pre-selected answer: %s\n" $answer
+    # hack: answer is a global variable, using it for preselection
     while [ "$i" = "none" ]; do
 	read -r -p "$message" i
 
@@ -202,12 +203,15 @@ get_answer_yes_no () {
 		break
 		;;
 	    *)
-		i="none"
-		printf "Select 'y' or 'n'.\n"
+		if [ -n "$answer" ]; then
+		    i="$answer"
+		else
+		    i="none"
+		    printf "Select 'y' or 'n'.\n"
+		fi
 		;;
 	esac
     done
-    #printf "Selected answer: %s\n" $answer
 }
 
 notify () {
@@ -264,8 +268,13 @@ parse_params () {
 		description="$2"
 		shift 2
 		;;
-            -n|--noconfirm)
-		noconfirm=1
+            -i|--interactive)
+		interactive=1
+		donotify=1
+		shift
+		;;
+            -n|--noconfirm|--batch)
+		batch=1
 		donotify=0
 		shift
 		;;
@@ -366,14 +375,15 @@ parse_params () {
 	printf "  disk Backupdir:   '%s'\n" "$backupdir_cmdline"
 	printf "  remote host:      '%s'\n" "$ssh"
 
-	printf "Snapper Descriptions"
+	printf "Snapper Descriptions\n"
 	printf "  backup finished:  '%s'\n" "$snap_description_finished"
 	printf "  backup synced:    '%s'\n" "$snap_description_synced"
 	printf "  backup running:   '%s'\n" "$snap_description_running"
 
 	if [ "$verbose" ]; then snap_sync_options="verbose=true"; fi
 	if [ "$dryrun" ]; then snap_sync_options="${snap_sync_options} dry-run=true"; fi
-	if [ "$noconfirm" ]; then snap_sync_options="${snap_sync_options} noconfirm=true"; fi
+	if [ "$batch" ]; then snap_sync_options="${snap_sync_options} batch=true"; fi
+	if [ "$interactive" ]; then snap_sync_options="${snap_sync_options} interactive=true batch=false"; fi
 	printf "Options:            '%s'\n" "${snap_sync_options}"
     fi
 }
@@ -401,7 +411,7 @@ run_config () {
 	fi
 
 	# cleanup failed former runs
-	check_snapper_failed_ids $noconfirm
+	check_snapper_failed_ids $batch
 
 	SNAP_SYNC_EXCLUDE=no
 	if [ -f "/etc/snapper/configs/$selected_config" ]; then
@@ -438,7 +448,7 @@ run_config () {
 		backupdir=$backupdir_cmdline
 		backup_root="$selected_target/$backupdir"
 	    else
-		if [ ! $noconfirm ]; then
+		if [ ! $batch ]; then
 		    read -r -p "Enter name of directory to store backups, relative to $selected_target (to be created if not existing): " backupdir
 		    if [ -z "$backupdir" ]; then
 			backup_root="$selected_target"
@@ -457,7 +467,24 @@ run_config () {
 		printf "Last syncronized Snapshot-ID for '%s': %s\n" "$selected_config" "$snapper_sync_id"
 		printf "Last syncronized Snapshot-Path for '%s': %s\n" "$selected_config" "$snapper_sync_snapshot"
 	    fi
+	    
 	    backupdir=$(snapper --config "$selected_config" list --type single | awk -F "|" '/subvolid='"$selected_subvol"'/, /uuid='"$selected_uuid"'/  {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
+	    if [ "$interactive" ]; then
+		if [ -z "$backupdir"]; then
+		    answer=yes
+		    get_answer_yes_no "Keep empty backupdir [Y/n]? " "$answer"
+		else
+		    get_answer_yes_no "Keep backupdir '$backupdir' [Y/n]? " "$answer"
+		fi
+		if [ "$answer" = "no" ]; then
+		    read -r -p "Enter name of directory to store backups, relative to $selected_target (to be created if not existing): " backupdir
+		    if [ -z "$backupdir" ]; then
+			backup_root="$selected_target"
+		    else
+			backup_root="$selected_target/$backupdir"
+		    fi
+		fi
+	    fi
 	    if [ -z "$backupdir" ]; then
 		backup_root="$selected_target"
 	    else
@@ -512,10 +539,11 @@ run_config () {
 
 	cont_backup="K"
 	eval "snapper_activate_$i=yes"
-	if [ $noconfirm ]; then
+	if [ $batch ]; then
 	    cont_backup="yes"
 	else
-	    get_answer_yes_no "Continue with backup [Y/n]? " "yes"
+	    answer=yes
+	    get_answer_yes_no "Continue with backup [Y/n]? " "$answer"
 	    if [ "$answer" = "no" ]; then
 		eval "snapper_activate_$i=no"
 		printf "Aborting backup for this configuration.\n"
@@ -528,10 +556,10 @@ run_config () {
 }
 
 run_cleanup () {
-    noconfirm="1"
+    batch="1"
 
     # cleanup failed runs
-    check_snapper_failed_ids "$noconfirm"
+    check_snapper_failed_ids "$batch"
 
     # cleanup target
     #$ssh btrfs subvolume delete $backup_root/$snapper_target_config/$snapper_snapshots/$snapper_new_id/snapshot
@@ -915,7 +943,7 @@ Options:
                           configuration. Can list multiple configurations within quotes, space-separated
                           (e.g. -c "root home").
  -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
-                          directory name on first backup"
+     --batch              directory name on first backup"
  -s, --subvolid <subvlid> Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
  -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt."
                           If multiple mount points are found with the same UUID, will prompt user."
@@ -1003,7 +1031,7 @@ verify_snapper_structure () {
 	    fi
 
 	    # cleanup generated snapper entry
-	    check_snapper_failed_ids $noconfirm
+	    check_snapper_failed_ids $batch
 	    die "Can't create new snapshot with given snapshot-id!"
 	    return=1
 	fi
