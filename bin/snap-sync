@@ -353,7 +353,7 @@ parse_params () {
 	if [ "$verbose" ]; then snap_sync_options="verbose=true"; fi
 	if [ "$dryrun" ]; then snap_sync_options="${snap_sync_options} dry-run=true"; fi
 	if [ "$noconfirm" ]; then snap_sync_options="${snap_sync_options} noconfirm=true"; fi
-	printf "Options:          '%s'\n" "${snap_sync_options}"
+	printf "Options:            '%s'\n" "${snap_sync_options}"
     fi
 }
 
@@ -401,7 +401,7 @@ run_config () {
 
 	# processed snapshot backup is marked with userdata key/value pairs
 	# backupdir, uuid
-	snapper_sync_id=$(eval snapper -c "$selected_config" list -t single | awk  '/subvolid='"$selected_subvol"'/, /uuid='"$selected_uuid"'/ {print $1}')
+	snapper_sync_id=$(eval snapper --config "$selected_config" list --type single | awk  '/subvolid='"$selected_subvol"'/, /uuid='"$selected_uuid"'/ {print $1}')
 	if [ ${#snapper_sync_id} -gt 0 ]; then
 	    snapper_sync_snapshot=$SUBVOLUME/.snapshots/$snapper_sync_id/snapshot
 	fi
@@ -435,7 +435,7 @@ run_config () {
 		printf "Last syncronized Snapshot-ID for '%s': %s\n" "$selected_config" "$snapper_sync_id"
 		printf "Last syncronized Snapshot-Path for '%s': %s\n" "$selected_config" "$snapper_sync_snapshot"
 	    fi
-	    backupdir=$(snapper -c "$selected_config" list -t single | awk -F "|" '/'"$selected_uuid"'/, /subvolid'="$selected_subvol"'/  {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
+	    backupdir=$(snapper --config "$selected_config" list --type single | awk -F "|" '/subvolid='"$selected_subvol"'/, /uuid='"$selected_uuid"'/  {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
 	    if [ -z "$backupdir" ]; then
 		backup_root="$selected_target"
 	    else
@@ -457,13 +457,15 @@ run_config () {
 
 	# acting on source system
 	if [ ! $dryrun ]; then
-	    printf "Creating new snapshot with snapper config '%s' ...\n" "$selected_config" | tee $PIPE
-	    snapper_new_id=$(snapper -c "$selected_config" create --print-number -d "$progname backup in progress")
+	    #printf "Creating new snapshot with snapper config '%s' ...\n" "$selected_config" | tee $PIPE
+	    printf "Creating new snapshot with snapper config '%s' ...\n" "$selected_config"
+	    snapper_new_id=$(snapper --config "$selected_config" create --print-number -d "$snap_description_running")
 	    snapper_new_snapshot=$SUBVOLUME/.snapshots/$snapper_new_id/snapshot
 	    snapper_new_info=$SUBVOLUME/.snapshots/$snapper_new_id/info.xml
 	    sync
 	else
-	    printf "dryrun: Creating new snapshot with snapper config '%s' ...\n" "$selected_config" | tee $PIPE
+	    #printf "dryrun: Creating new snapshot with snapper config '%s' ...\n" "$selected_config" | tee $PIPE
+	    printf "dryrun: Creating new snapshot with snapper config '%s' ...\n" "$selected_config"
 	    snapper_new_id="<new_snapper_id>"
 	fi
 
@@ -481,6 +483,7 @@ run_config () {
 	eval "snapper_new_id_$i='$snapper_new_id'"
 	eval "snapper_new_snapshot_$i='$snapper_new_snapshot'"
 	eval "snapper_new_info_$i='$snapper_new_info'"
+	eval "snapper_sync_snapshot_$i='$snapper_sync_snapshot'"
 	eval "snapper_config_$i='$selected_config'"
 	eval "snapper_target_config_$i='$snapper_target_config'"
 	eval "snapper_target_snapshot_$i='$snapper_target_snapshot'"
@@ -494,7 +497,7 @@ run_config () {
 	    if [ "$answer" = "no" ]; then
 		eval "snapper_activate_$i=no"
 		printf "Aborting backup for this configuration.\n"
-		snapper -c $selected_config delete $snapper_new_id
+		snapper --config $selected_config delete $snapper_new_id
 	    fi
 	fi
 	i=$(($i+1))
@@ -697,9 +700,9 @@ run_finalize () {
 	    $ssh "snapper --verbose --config $snapper_target_config modify --description \"$target_description\" --userdata \"$target_userdata\" $snapper_new_id"
 	    $ssh sync
 	else
-	    cmd="snapper -v -c $selected_config modify -d $description -u $userdata $snapper_new_id"
+	    cmd="snapper --verbose --config $selected_config modify --description $snap_description_lastsync --userdata $userdata $snapper_new_id"
 	    printf "dryrun: %s\n" "$cmd"
-	    cmd="$ssh snapper -v -c $snapper_target_config modify -d $target_description -u $target_userdata $snapper_new_id"
+	    cmd="$ssh snapper --verbose --config $snapper_target_config modify -description $snap_description_finished --userdata $target_userdata $snapper_new_id"
 	    printf "dryrun: %s\n" "$cmd"
 	fi
 
