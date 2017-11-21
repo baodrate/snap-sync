@@ -183,6 +183,10 @@ parse_params () {
                 #  Call usage() function.
                 usage
                 ;;
+            -b|--backupdir)
+		backupdir_cmdline="$2"
+		shift 2
+		;;
             -c|--config)
 		selected_config="$2"
 		shift 2
@@ -200,11 +204,11 @@ parse_params () {
 		subvolid_cmdline="$2"
 		shift 2
 		;;
-            -t|--TARGET)
+            -t|--target|--TARGET)
 		target_cmdline="$2"
 		shift 2
 		;;
-            -u|--UUID)
+            -u|--uuid|--UUID)
 		uuid_cmdline="$2"
 		shift 2
 		;;
@@ -212,6 +216,10 @@ parse_params () {
 		verbose=1
 		shift 1
 		;;
+	    --backupdir=*)
+                backupdir_cmdline=${1#*=}
+                shift
+                ;;
 	    --config=*)
                 selected_config=${1#*=}
                 shift
@@ -229,11 +237,11 @@ parse_params () {
                 subvolid_cmdline=${1#*=}
                 shift
                 ;;
-	    --TARGET=*)
+	    --target=*|TARGET=*)
                 target_cmdline=${1#*=}
                 shift
                 ;;
-	    --UUID=*)
+	    --uuid=*|UUID=*)
                 uuid_cmdline=${1#*=}
                 shift
                 ;;
@@ -260,6 +268,7 @@ parse_params () {
     uuid_cmdline=${uuid_cmdline:-"none"}
     target_cmdline=${target_cmdline:-"none"}
     subvolid_cmdline=${subvolid_cmdline:-"none"}
+    backupdir_cmdline=${backupdir_cmdline:-"none"}
 
     if [ -z $remote ]; then
 	ssh=""
@@ -367,20 +376,21 @@ run_config () {
 	eval "snapper_sync_id_$i='$snapper_sync_id'"
 	eval "snapper_sync_snapshot_$i='$snapper_sync_snapshot'"
 
+	# verify backupdir
 	if [ -z "$snapper_sync_id" ]; then
 	    printf "No backups have been performed for snapper config '%s' on target disk.\n" "$selected_config"
-	    if [ $noconfirm ]; then
-		# go with defaults
-		if [ "$verbose" ]; then
-		    printf "using defaults\n"
-		fi
-	    else
-		read -r -p "Enter name of directory to store backups, relative to $selected_target (to be created if not existing): " backupdir
-	    fi
-	    if [ -z "$backupdir" ]; then
-		backup_root="$selected_target"
-	    else
+	    if [ "$backupdir_cmdline" != "none" ]; then
+		backupdir=$backupdir_cmdline
 		backup_root="$selected_target/$backupdir"
+	    else
+		if [ ! $noconfirm ]; then
+		    read -r -p "Enter name of directory to store backups, relative to $selected_target (to be created if not existing): " backupdir
+		    if [ -z "$backupdir" ]; then
+			backup_root="$selected_target"
+		    else
+			backup_root="$selected_target/$backupdir"
+		    fi
+		fi
 	    fi
 	else
             if [ "$verbose" ]; then
