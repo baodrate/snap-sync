@@ -527,6 +527,22 @@ run_config () {
     done
 }
 
+run_cleanup () {
+    noconfirm="1"
+
+    # cleanup failed runs
+    check_snapper_failed_ids "$noconfirm"
+
+    # cleanup target
+    #$ssh btrfs subvolume delete $backup_root/$snapper_target_config/$snapper_snapshots/$snapper_new_id/snapshot
+    #$ssh rm -rf $backup_root/$snapper_target_config/$snapper_snapshots/$snapper_new_id
+
+    # cleanup TEMPDIR
+    if [ -d $TMPDIR_PIPE ]; then
+	rm -rf $TMPDIR_PIPE || die "Failed to cleanup temporary directory '%s'\n" "$TMPDIR_PIPE"
+    fi
+}
+
 run_backup () {
     # Actual backing up
     #printf "\nPerforming backups...\n" | tee $PIPE
@@ -883,7 +899,9 @@ traperror () {
 }
 
 trapkill () {
-    die "Exited due to user intervention."
+    printf "Exited due to user intervention.\n"
+    run_cleanup 1
+    exit 0
 }
 
 usage () {
@@ -978,13 +996,14 @@ verify_snapper_structure () {
 	    fi
 	    $ssh mkdir --mode=0700 $backup_root/$snapper_config/$snapper_snapshots/$snapper_id
 	else
-	    if [ "$verbose" ]; then
-		printf "Snapshot %s already in use on target %s.\n" "$snapper_id" "$backup_root/$snapper_config/$snapper_snapshots"
+	    if [ -z "$remote" ]; then
+		printf "Cancel Snapshot creation: Former snapshot with id '%s' already exist in '%s'\n" "$snapper_id" "$backup_root/$snapper_config/$snapper_snapshots"
+	    else
+		printf "Cancel Snapshot creation: Former snapshot with id '%s' already exist on %s in '%s'\n" "$snapper_id" "$remote" "$backup_root/$snapper_config/$snapper_snapshots"
 	    fi
-	    printf "Cancel Snapshot creation: Former snapshot with id '%s' already exist in '%s'\n" "\
-	    	   $snapper_id" "$backup_root/$snapper_config/$snapper_snapshots"
+
 	    # cleanup generated snapper entry
-	    check_snapper_failed_ids
+	    check_snapper_failed_ids $noconfirm
 	    die "Can't create new snapshot with given snapshot-id!"
 	    return=1
 	fi
@@ -1054,6 +1073,9 @@ run_finalize
 
 printf "\nDone!\n" | tee $PIPE
 exec 3>&-
+
+# cleanup
+run_cleanup
 
 if [ "$uuid_cmdline" != "none" ]; then
     notify_info "Finished" "Backups to $uuid_cmdline complete!"
