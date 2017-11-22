@@ -214,6 +214,22 @@ get_answer_yes_no () {
     done
 }
 
+get_config(){
+    local config=${1:-/etc/snapper/config-templates/snap-sync}
+    local config_key=${2:-SUBVOLUME}
+
+    IFS="="
+    while read -r name value
+    do
+	if [ "$name" = "$config_key" ]; then
+	    value="$value"
+	    SUBVOLUME="$value"
+	    break
+	fi
+    done < $config
+
+}
+
 notify () {
     # estimation: batch calls should just log
     if [ $donotify ]; then
@@ -419,7 +435,7 @@ run_config () {
 	    if [ "$SUBVOLUME" = "/" ]; then
 		SUBVOLUME=''
 	    fi
-	    else
+	else
 	    die "Selected snapper configuration $selected_config does not exist."
 	fi
 
@@ -467,7 +483,7 @@ run_config () {
 		printf "Last syncronized Snapshot-ID for '%s': %s\n" "$selected_config" "$snapper_sync_id"
 		printf "Last syncronized Snapshot-Path for '%s': %s\n" "$selected_config" "$snapper_sync_snapshot"
 	    fi
-	    
+
 	    backupdir=$(snapper --config "$selected_config" list --type single | awk -F "|" '/subvolid='"$selected_subvol"'/, /uuid='"$selected_uuid"'/  {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
 	    if [ "$interactive" ]; then
 		if [ -z "$backupdir"]; then
@@ -490,7 +506,6 @@ run_config () {
 	    else
 		backup_root="$selected_target/$backupdir"
 	    fi
-	    $ssh test -d $backup_root || die "%s is not a directory on %s.\n" "$backup_root" "$selected_uuid"
 	fi
 
 	eval "backup_root_$i=$backup_root"
@@ -632,7 +647,7 @@ run_backup () {
 	    cmd="btrfs send $verbose_flag $snapper_new_snapshot 2>$BTRFS_PIPE | $cmd_pv $ssh btrfs receive $verbose_flag $snapper_target_snapshot 2>$BTRFS_PIPE"
 	    if [ ! "$dryrun" ]; then
 		# this could take a while, depending on datasize
-		$(eval $cmd)
+		eval $cmd 1>/dev/null
 		if [ "$?" -gt 0 ]; then
 		    printf "BTRFS_PIPE: %s" "cat $BTRFS_PIPE"
 		    die "btrfs pipe error."
@@ -651,10 +666,10 @@ run_backup () {
 		# location where it can get its data. This helps speed up the transfer.
 		if [ ! "$dryrun" ]; then
 		    if [ "$verbose" ]; then
-			printf "btrfs-send will use targets snapshot '%s' to sync metadata for %s ...\n" "$snapper_sync_snapshot" "$snapper_new_snapshot"
+			printf "btrfs-send will use snapshot '%s' on target to sync metadata for %s ...\n" "$snapper_sync_snapshot" "$snapper_new_snapshot"
 		    fi
-		    cmd="btrfs send $verbose_flag -c $snapper_sync_snapshot $snapper_new_snapshot 2>$BTRFS_PIPE | $cmd_pv $ssh btrfs receive $verbose_flag $snapper_target_snapshot 2>/dev/null"
-		    ret=$(eval $cmd)
+		    cmd="btrfs send $verbose_flag -c $snapper_sync_snapshot $snapper_new_snapshot 2>$BTRFS_PIPE | $cmd_pv $ssh btrfs receive $verbose_flag $snapper_target_snapshot 2>$BTRFS_PIPE"
+		    eval $cmd 1>/dev/null
 		    if [ "$?" -gt 0 ]; then
 			printf "BTRFS_PIPE: %s" "cat $BTRFS_PIPE"
 			die "btrfs pipe error."
@@ -669,15 +684,14 @@ run_backup () {
 		# need to use source snapshot to provide metadata for target
 		if [ ! "$dryrun" ]; then
 		    if [ "$verbose" ]; then
-			printf "btrfs-send is using source snapshot '%s' to read metadata ...\n" "$snapper_sync_snapshot" | tee $PIPE
-			printf "Deleting old sync snapshot %s for %s ...\n" "$snapper_sync_id" "$selected_config" | tee $PIPE
+			printf "btrfs-send is using snapshot '%s' from source to read metadata ...\n" "$snapper_sync_snapshot" | tee $PIPE
 		    fi
-		    cmd="btrfs send $verbose_flag -p $snapper_sync_snapshot $snapper_new_snapshot 2>$BTRFS_PIPE | $cmd_pv $ssh btrfs receive $verbose_flag $snapper_target_snapshot 2>/dev/null" 
-		    $(eval $cmd)
-		    ret=$(eval $cmd)
+		    cmd="btrfs send $verbose_flag -p $snapper_sync_snapshot $snapper_new_snapshot 2>$BTRFS_PIPE | $cmd_pv $ssh btrfs receive $verbose_flag $snapper_target_snapshot 2>BTRFS_PIPE"
+		    #$(eval $cmd)
+		    eval $cmd 1>/dev/null
 		    if [ "$?" -gt 0 ]; then
 			printf "BTRFS_PIPE: %s" "cat $BTRFS_PIPE"
-			die "btrfs pipe error."
+			#die "btrfs pipe error."
 		    fi
 		    #printf  "btrfs returns: '%i'\n" "$ret"
 		else
@@ -917,6 +931,18 @@ select_target_disk () {
     fi
 }
 
+set_config(){
+    local config=${1:-/etc/snapper/config-templates/snap-sync}
+    local config_key=${2:-SUBVOLUME}
+    local config_value=${3:-/var/lib/snap-sync}
+
+    if [ -n "$ssh" ]; then
+	$ssh sed -i \'"s#^\($config_key\s*=\s*\).*\$#\1\"$config_value\"#"\' $config
+    else
+	sed -i "s#^\($config_key\s*=\s*\).*\$#\1\"$config_value\"#" $config
+    fi
+}
+
 traperror () {
     printf "Exited due to error on line %s.\n" $1
     printf "exit status: %s\n" "$2"
@@ -991,11 +1017,24 @@ verify_snapper_structure () {
 	    if [ "$verbose" ]; then
 		printf "Create new snapper capable subvolume in '%s' ...\n"  "$backup_root/$snapper_config"
 	    fi
-	    # TODO: test if there is any old snapper config
+
+	    # notify if SUBVOLUME has changed
 	    create_config="btrfs subvolume create $backup_root/$snapper_config"
 	    $ssh $create_config || die "Snapper structure for config %s to hold target snapshots could not be created in directory on %s.\n" "$snapper_config" "$backup_root"
-	    # snapper-logic will create $backup_root/$snapper_config/.snapshots
-	    $ssh snapper --config $snapper_config create-config --template snap-sync $backup_root/$snapper_config
+
+	    if $ssh [ ! -f /etc/snapper/configs/$snapper_config ]; then
+		# snapper-logic will create $backup_root/$snapper_config/.snapshots
+		$ssh snapper --config $snapper_config create-config --template snap-sync $backup_root/$snapper_config
+	    else
+		# if changed, adapt targets SUBVOLUME in given config
+		get_config "/etc/snapper/configs/$snapper_config" "SUBVOLUME"
+		if $ssh [ "$SUBVOLUME" != \"$backup_root/$snapper_config\" ]; then
+		    SUBVOLUME="$backup_root/$snapper_config"
+		    set_config "/etc/snapper/configs/$snapper_config" "SUBVOLUME" "$SUBVOLUME"
+		    cmd="btrfs subvolume create $backup_root/$snapper_config/$snapper_snapshots"
+		    $ssh $cmd || die "Can't create subvolume %s in %s to hold target snapshots.\n" "$snapper_snapshots" "$backup_root/$snapper_config"
+		fi
+	    fi
 	    $ssh chmod 0700 $backup_root/$snapper_config
 	    sync
 	else
@@ -1010,12 +1049,19 @@ verify_snapper_structure () {
 	if [ $(eval $cmd) -ne 256 ]; then
 	    die "%s needs to be a BTRFS subvolume. But given %s is just a directory.\n" "$snapper_config" "$backup_root/$snapper_config"
 	fi
-	# test if there is any restover/old snapper config
+	# if changed, adapt SUBVOLUME in given config
+	#$ssh $(. /etc/snapper/configs/$snapper_config)
+	get_config "/etc/snapper/configs/$snapper_config" "SUBVOLUME"
+	if $ssh [ "$SUBVOLUME" != \"$backup_root/$snapper_config\" ]; then
+	    SUBVOLUME="$backup_root/$snapper_config"
+	    set_config "/etc/snapper/configs/$snapper_config" "SUBVOLUME" "$SUBVOLUME"
+	fi
 	if $ssh [ ! -d $backup_root/$snapper_config/$snapper_snapshots ]; then
 	    cmd="btrfs subvolume create $backup_root/$snapper_config/$snapper_snapshots"
 	    $ssh $cmd || die "Can't create subvolume %s in %s to hold target snapshots.\n" "$snapper_snapshots" "$backup_root/$snapper_config"
 	fi
     fi
+
     # verify that target snapshot id can take the new snapshot data
     if [ ! "$dryrun" ]; then
 	if $ssh [ ! -d $backup_root/$snapper_config/$snapper_snapshots/$snapper_id ]; then
