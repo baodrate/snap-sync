@@ -27,23 +27,23 @@
 set -o errtrace
 
 version="0.4.2"
-name="snap-sync"
+progname="snap-sync"
 
 # The following line is modified by the Makefile or
 # find_snapper_config script
 SNAPPER_CONFIG=/etc/sysconfig/snapper
 
 TMPDIR=$(mktemp -d)
-PIPE=$TMPDIR/$name.out
+PIPE=$TMPDIR/$progname.out
 mkfifo $PIPE
-systemd-cat -t "$name" < $PIPE &
+systemd-cat -t "$progname" < $PIPE &
 exec 3>$PIPE
 
 notify() {
     for u in $(users | sed 's/ /\n/' | sort -u); do
         sudo -u $u DISPLAY=:0 \
         DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
-        notify-send -a $name "$1" "$2" --icon="dialog-$3"
+        notify-send -a $progname "$1" "$2" --icon="dialog-$3"
     done
 }
 
@@ -70,7 +70,7 @@ traperror() {
     printf "exit status: %s\n" "$2"
     printf "command: %s\n" "$3"
     printf "bash line: %s\n" "$4"
-    printf "function name: %s\n" "$5"
+    printf "function progname: %s\n" "$5"
     exit 1
 }
 
@@ -83,8 +83,8 @@ trap trapkill SIGTERM SIGINT
 
 usage() {
   cat <<EOF
-$name $version
-Usage: $name [options]
+$progname $version
+Usage: $progname [options]
 
 Options:
  -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
@@ -258,8 +258,8 @@ for x in $selected_configs; do
         continue
     fi
 
-    if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
-        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x" | tee $PIPE
+    if [[ "$(snapper -c $x list -t single | awk '/'$progname' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
+        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$progname" "$x" | tee $PIPE
         read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
         while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
             "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
@@ -272,7 +272,7 @@ for x in $selected_configs; do
             fi
         done
         if [[ "$delete_failed" == [Yy]"es" || "$delete_failed" == [Yy] ]]; then
-            snapper -c $x delete $(snapper -c $x list | awk '/'$name' backup in progress/ {print $3}')
+            snapper -c $x delete $(snapper -c $x list | awk '/'$progname' backup in progress/ {print $3}')
         fi
     fi
 
@@ -311,7 +311,7 @@ for x in $selected_configs; do
     MYBACKUPDIR_ARRAY[$i]="$mybackupdir"
 
     printf "Creating new snapshot for %s...\n" "$x" | tee $PIPE
-    new_num=$(snapper -c "$x" create --print-number -d "$name backup in progress")
+    new_num=$(snapper -c "$x" create --print-number -d "$progname backup in progress")
     new_snap=$SUBVOLUME/.snapshots/$new_num/snapshot
     new_info=$SUBVOLUME/.snapshots/$new_num/info.xml
     sync
