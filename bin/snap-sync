@@ -81,10 +81,14 @@ check_snapper_failed_ids () {
     # "$progname backup in progress" (snapper description field)
     snapper_failed_ids=$(eval snapper -c $selected_config list -t single | awk '/'"$progname"' backup in progress/ {cnt++} END {print cnt}')
     if [ -n "$snapper_failed_ids" ]; then
-        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$progname" "$selected_config" | tee $PIPE
-	get_answer_yes_no "Delete failed backup snapshots [y/N]? " "no"
-	if [ "$answer" = "yes" ]; then
+        if [ noconfirm ]; then
 	    snapper -c $selected_config delete $(snapper -c $selected_config list | awk '/'"$progname"' backup in progress/ {print $3}')
+	else
+	    printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$progname" "$selected_config" | tee $PIPE
+	    get_answer_yes_no "Delete failed backup snapshots [y/N]? " "no"
+	    if [ "$answer" = "yes" ]; then
+		snapper -c $selected_config delete $(snapper -c $selected_config list | awk '/'"$progname"' backup in progress/ {print $3}')
+	   fi
 	fi
     fi
 }
@@ -118,7 +122,7 @@ get_disk_infos () {
     fi
 
     # we need at least one target disk
-    if [ ${#disk_targets} -eq 0 ]; then die "no suitable target disk found \n"die
+    if [ ${#disk_targets} -eq 0 ]; then die "no suitable target disk found"
     fi
 
     # Posix Shells do not support Array. Therefore using ...
@@ -229,7 +233,11 @@ parse_params () {
 		shift 2
 		;;
             -c|--config)
-		selected_config="$2"
+		if [ ${#selected_config} -gt 0 ]; then
+                    selected_config="${selected_config} ${2}"
+		else
+                    selected_config="$2"
+		fi
 		shift 2
 		;;
             -d|--description)
@@ -262,8 +270,12 @@ parse_params () {
                 shift
                 ;;
 	    --config=*)
-                selected_config=${1#*=}
-                shift
+		if [ ${#selected_config} -gt 0 ]; then
+                    selected_config="${selected_config} ${1#*=}"
+		else
+                    selected_config="${1#*=}"
+		fi
+		shift
                 ;;
 	    --dry-run)
 		dryrun=1
@@ -292,11 +304,11 @@ parse_params () {
                ;;
             -*)
                 printf "WARN: Unknown option (ignored): $1" >&2
-                #shift
-                exit 1
+		die "Unknown option"
                 ;;
             *)
-		die "Unknown option: $key\nRun '$progname -h' for valid options.\n"
+		printf "Unknown option: %s\nRun '%s -h' for valid options.\n" $key $progname
+		die "Unknown option"
 		;;
 	esac
     done
@@ -396,6 +408,11 @@ run_config () {
 			backup_root="$selected_target"
 		    else
 			backup_root="$selected_target/$backupdir"
+		    fi
+		else
+		    # use sane default
+		    if [ -z "$backup_root" ]; then
+			backup_root="$selected_target"
 		    fi
 		fi
 	    fi
@@ -510,12 +527,7 @@ run_backup () {
 	snapper_target_config=$(eval echo \$snapper_target_config_$i)
 	snapper_target_snapshot=$(eval echo \$snapper_target_snapshot_$i)
 
-	if [ ! "$dryrun" ]; then
-	    verify_snapper_structure $backup_root $snapper_config $snapper_target_config $snapper_new_id
-	else
-	    cmd="verify_snapper_structure $backup_root $snapper_config $snapper_target_config $snapper_new_id"
-	    printf "dryrun: %s\n" "$cmd"
-	fi
+	verify_snapper_structure "backup_root=$backup_root" "snapper_target_config=$snapper_target_config" "snapper_new_id=$snapper_new_id"
 
 	if [ -z "$snapper_sync_id" ]; then
 	    cmd="btrfs send $snapper_new_snapshot | $ssh btrfs receive $snapper_target_snapshot"
@@ -525,7 +537,8 @@ run_backup () {
 		cmd="btrfs send -v $snapper_new_snapshot | $ssh btrfs receive -v $snapper_target_snapshot"
 	    fi
 	    if [ ! "$dryrun" ]; then
-	       btrfs send "$snapper_new_snapshot" | $ssh btrfs receive "$snapper_target_snapshot" &>/dev/null
+		btrfs send "$snapper_new_snapshot" | $ssh btrfs receive "$snapper_target_snapshot" &>/dev/null
+		sync
 	    else
 	       cmd="btrfs send -v $snapper_new_snapshot | $ssh btrfs receive -v $snapper_target_snapshot"
 	       printf "dryrun: %s\n" "$cmd"
@@ -543,6 +556,7 @@ run_backup () {
 		   printf "Deleting sync snapshot for %s ...\n" "$selected_config" | tee $PIPE
 	       fi
                snapper -c "$selected_config" delete "$snapper_sync_id"
+	       sync
 	    else
 	       printf "dryrun: btrfs send %s -c %s  %s | %s btrfs receive %s %s\n" \
 		       "$verbose_flag" "$snapper_sync_snapshot" "$snapper_new_snapshot" \
@@ -581,8 +595,10 @@ run_backup () {
 	# Tag new snapshot as the latest
 	printf "Tagging snapper metadata for configuration '%s' ...\n" "$selected_config" | tee $PIPE
 	if [ ! "$dryrun" ]; then
-	    snapper -v -c "$selected_config" modify -d \"$description\" -u \"$userdata\" "$snapper_new_id"
-	    $ssh snapper -v -c "$snapper_target_config" modify -d \"$target_description\" -u \"$target_userdata\" "$snapper_new_id"
+	    eval snapper --verbose --config "$selected_config" modify --description \"$description\" --userdata \"$userdata\" "$snapper_new_id"
+	    sync
+	    $ssh snapper --verbose --config "$snapper_target_config" modify --description \"$target_description\" --userdata \"$target_userdata\" "$snapper_new_id"
+	    $ssh sync
 	else
 	    cmd="snapper -v -c $selected_config modify -d $description -u $userdata $snapper_new_id"
 	    printf "dryrun: %s\n" "$cmd"
@@ -737,46 +753,85 @@ EOF
 }
 
 verify_snapper_structure () {
-    local backup_root=$1
-    local snapper_config=$2
-    local snapper_subvol=$3
-    local snapper_id=$4
+    local backup_root=${1##backup_root=}
+    local snapper_config=${2##snapper_target_config=}
+    local snapper_id=${3##snapper_new_id=}
 
     local snapper_snapshots=".snapshots"
 
     if [ "$verbose" ]; then
-	echo "Verify snapper filesystem structure on target ..."
+	printf "Verify snapper filesystem structure on target ...\n"
     fi
 
     # if not accessible, create backup-path
     if $ssh [ ! -d $backup_root ]; then
-	if [ "$verbose" ]; then
-	    echo "Create backup-path $backup_root ..."
+	if [ ! "$dryrun" ]; then
+	    if [ "$verbose" ]; then
+		printf "Create backup-path %s ...\n" "$backup_root"
+	    fi
+	    $ssh mkdir --mode=0700 --parents $backup_root
+	else
+	    printf "dryrun: Would create backup-path $backup_root %s ...\n" "$backup_root"
 	fi
-	$ssh mkdir --mode=0700 --parents $backup_root
     fi
-    if $ssh [ ! -d $backup_root/$snapper_subvol ]; then
+
+    # verify that we have a snapper compatible structure for selected config on target
+    if $ssh [ ! -d $backup_root/$snapper_config ]; then
 	if $ssh [ ! -f $SNAPPER_TEMPLATES/snap-sync ]; then
-	    die "A snapper template %s to configure the snapper subvolume %s is missing in %s. Did you miss to install the package default template?\n" "snap-sync" "$snapper_config" "$SNAPPER_TEMPLATES"
+	    printf "A snapper template %s to configure the snapper subvolume %s is missing in %s.\n" "snap-sync" "$snapper_config" "$SNAPPER_TEMPLATES"
+	    printf "Did you miss to install the snap-sync's default snapper template?\n"
+	    die "snapper template %s to configure the snapper subvolume %s is missing in %s.\n" "snap-sync" "$snapper_config" "$SNAPPER_TEMPLATES"
 	fi
-	if [ "$verbose" ]; then
-	    printf "Create new snapper capable subvolume in '%s' ...\n"  "$backup_root/$snapper_subvol"
+	if [ ! "$dryrun" ]; then
+	    if [ "$verbose" ]; then
+		printf "Create new snapper capable subvolume in '%s' ...\n"  "$backup_root/$snapper_config"
+	    fi
+	    # TODO: test if there is any old snapper config
+	    create_config="btrfs subvolume create $backup_root/$snapper_config"
+	    $ssh $create_config || die "Snapper structure for config %s to hold target snapshots could not be created in directory on %s.\n" "$snapper_config" "$backup_root"
+	    # snapper-logic will create $backup_root/$snapper_config/.snapshots
+	    $ssh snapper --config $snapper_config create-config --template snap-sync $backup_root/$snapper_config
+	    $ssh chmod 0700 $backup_root/$snapper_config
+	    sync
+	else
+	    printf "dryrun: Would create new snapper structure in '%s' ...\n"  "$backup_root/$snapper_config"
 	fi
 	create_subvol="btrfs subvolume create $backup_root/$snapper_subvol"
 	$ssh $create_subvol || die "BTRFS subvolume %s to hold snapshots for config %s could not be created in directory on %s.\n" "$snapper_subvol" "$snapper_config" "$backup_root"
 	$ssh snapper --config $snapper_subvol create-config --template snap-sync $backup_root/$snapper_subvol
-	$ssh chmod --mode=0700 $backup_root/$snapper_config
+	$ssh chmod 0700 $backup_root/$snapper_subvol
     else
-	if $ssh [ `stat --format=%i $backup_root/$snapper_subvol` -ne 256 ]; then
-	    die "%s needs to be a BTRFS subvolume. But given %s is just a directory.\n" "$snapper_subvol" "$backup_root/$snapper_subvol"
+	cmd="$ssh stat --format=%i $backup_root/$snapper_config"
+	if [ $(eval $cmd) -ne 256 ]; then
+	    die "%s needs to be a BTRFS subvolume. But given %s is just a directory.\n" "$snapper_config" "$backup_root/$snapper_config"
+	fi
+	# test if there is any restover/old snapper config
+	if $ssh [ ! -d $backup_root/$snapper_config/$snapper_snapshots ]; then
+	    cmd="btrfs subvolume create $backup_root/$snapper_config/$snapper_snapshots"
+	    $ssh $cmd || die "Can't create subvolume %s in %s to hold target snapshots.\n" "$snapper_snapshots" "$backup_root/$snapper_config"
 	fi
     fi
-
-    if $ssh [ ! -d $backup_root/$snapper_subvol/$snapper_snapshots/$snapper_id  ]; then
-	if [ "$verbose" ]; then
-	    echo "Create backup-path $backup_root/$snapper_subvol/$snapper_snapshots/$snapper_id"
+    # verify that target snapshot id can take the new snapshot data
+    if [ ! "$dryrun" ]; then
+	if $ssh [ ! -d $backup_root/$snapper_config/$snapper_snapshots/$snapper_id ]; then
+	    if [ "$verbose" ]; then
+		printf "Create path %s to store target snapshot.\n" "$backup_root/$snapper_config/$snapper_snapshots/$snapper_id"
+	    fi
+	    $ssh mkdir --mode=0700 $backup_root/$snapper_config/$snapper_snapshots/$snapper_id
+	else
+	    if [ "$verbose" ]; then
+		printf "Snapshot %s already in use on target %s.\n" "$snapper_id" "$backup_root/$snapper_config/$snapper_snapshots"
+	    fi
+	    printf "Cancel Snapshot creation: Former snapshot with id '%s' already exist in '%s'\n" "\
+	    	   $snapper_id" "$backup_root/$snapper_config/$snapper_snapshots"
+	    # cleanup generated snapper entry
+	    check_snapper_failed_ids
+	    die "Can't create new snapshot with given snapshot-id!"
+	    return=1
 	fi
-	$ssh mkdir --mode=0700 $backup_root/$snapper_subvol/$snapper_snapshots/$snapper_id
+    else
+	printf "dryrun: Would check/create path %s to store target snapshot ...\n" \
+	       "$backup_root/$snapper_config/$snapper_snapshots/$snapper_id"
     fi
 }
 
