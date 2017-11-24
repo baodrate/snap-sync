@@ -1,4 +1,4 @@
-#!/bin/sh
+#! /bin/sh
 
 # snap-sync
 # https://github.com/wesbarnett/snap-sync
@@ -73,13 +73,14 @@ check_prerequisites () {
     which btrfs >/dev/null 2>&1 || { printf "'btrfs' is not installed." && exit 1; }
     which findmnt >/dev/null 2>&1 || { printf "'findmnt' is not installed." && exit 1; }
     which systemd-cat >/dev/null 2>&1 || { printf "'systemd-cat' is not installed." && exit 1; }
+    which snapper >/dev/null 2>&1 || { printf "'snapper' is not installed." && exit 1; }
     which wc >/dev/null 2>&1 || { printf "'wc' is not installed." && exit 1; }
 
     # optional binaries:
     which notify-send >/dev/null 2>&1 && { donotify=1; }
     which pv >/dev/null 2>&1 && { do_pv_cmd=1; }
 
-    if [ $(id -u) -ne 0 ] ; then printf "Script must be run as root" ; exit 1 ; fi
+    if [ $(id -u) -ne 0 ] ; then printf "Script must be run as root\n" ; exit 1 ; fi
 
     if [ ! -r "$SNAPPER_CONFIG" ]; then
 	die "$SNAPPER_CONFIG does not exist."
@@ -1157,9 +1158,8 @@ verify_snapper_structure () {
 cwd=`pwd`
 ssh=""
 
-# this bashism and can't be ported to dash (ERR is not supported)
+# can't be ported to dash (ERR is not supported)
 #trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
-#trap 'traperror ${LINENO} $?' ERR
 trap trapkill TERM INT
 
 check_prerequisites
