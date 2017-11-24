@@ -1,24 +1,40 @@
+<!-- snap-sync README.md -->
+<!-- version: 0.5.1 -->
+
 # snap-sync
 
 ## About
 
-This bash script sends incremental snapshots to another drive for backing up
-data. Plug in and mount any btrfs-formatted device you want your system to be
-backed up to (like a USB drive).  When you run the script you will be prompted
-to select a mounted btrfs device, or you can optionally select the disk using
-its UUID on the command line.
+`snap-sync` is implemented as a posix shell script.
+It takes advantage of the specific functionality of a btrfs file system and
+makes it possible to backup data while sending incremental snapshots to another
+drive. It's fine to store to dives on a remote host (using ssh).
 
-The script iterates through all snapper configurations by default (this can be
-changed using the `-c` flag). For each configuration it creates a new local
-snapshot. If you have never synced to the specified device you will be prompted
-to enter a directory on the device where the backup snapshots will go.
-Additionally you are shown the location of the backed up snapshot. If you have
-performed a backup to this device before, only the changes since the last backup
-have to be sent.
+Plug in and mount any btrfs-formatted device you want your system to be
+backed up to (eg. local USB drive, remote RAID drives).
+
+`snap-sync` will support interactive an time scheduled backup runs.
+
+* An interactive run will request you to select a mounted btrfs device.
+You can pre-select the target drive via [command line options](https://github.com/wesbarnett/snap-sync#options).
+Either use the UUID, the SUBVOLID or it's TARGET (read 'mount point').
+
+* A scheduled run will take all needed parameters from config options.
+
+For a backup run, `snap-sync` will iterate through all defined snapper configurations
+found on your source system. If you prefer to just run on a specific configuration,
+you can select this using the 'config' option `-c`. For each selected configuration
+it will use snapper to create an appropriate local snapshot.
 
 ## Requirements
 
-snapper is required.
+`snap-sync`relies on external tools to achieve its goal.
+At run-time their availability is checked. Following tools are are used:
+
+- snapper
+- awk
+- sed
+- notify-send
 
 ## Installation
 
@@ -29,6 +45,9 @@ configuration file, specify it on the command line with
 `SNAPPER_CONFIG`. For example, for Arch Linux use:
 
     # make SNAPPER_CONFIG=/etc/conf.d/snapper install
+
+The local snapper configuration will be extended to make use
+of a new template 'snap-sync'.
 
 The package is also available in the
 [AUR](https://aur.archlinux.org/packages/snap-sync/).
@@ -44,109 +63,85 @@ The package is also available in the
                               (e.g. -c "root home").
      -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
                               directory name on first backup
-     -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
-                              If multiple mount points are found with the same UUID, will prompt user.
+     -u, --uuid <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
+         --UUID <UUID>        If multiple mount points are found with the same UUID, will prompt user.
      -s, --subvolid <subvlid> Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
-     --remote <address>       Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
+         --SUBVOLID
+     -t, --target <target>    Specify the mountpoint of the BTRFS subvolume to back up to.
+	     --TARGET <target>
+         --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
                               should specify the remote machine's hostname or ip address. The 'root' user must be
                               permitted to login on the remote machine.
+         --dry-run            perform a trial run with no changes made.
+     -v, --verbose            Be more verbose on what's going on.
 
 ## First run
 
-When you run `snap-sync` you will be prompted to choose a disk to back up to.
-The first time you run `snap-sync` for a particular disk (new UUID) you will be
-prompted to choose a backup location on that disk. If the directory you specify
-does not exist, it will be created.
+If you have never synced to the paticular target device (first run), `snap-sync`
+will take care to create the necessary target file-structure to store the snapshot.
+As an option you can prepend a backup-path.
+
+Before the sync job is started, source and target locations will be presented.
+You have to confirm any further operation, or use defaults (option: noconfirm).
 
 ## Example command line usage
 
-### No arguments
+### Snap-sync to local target
+
+#### Default: no selections, run for all snapper configs
 
     # snap-sync
 
-    Select a mounted BTRFS device on your local machine to backup to.
-       1) /mnt (uuid=7360922b-c916-4d9f-a670-67fe0b91143c, subvolid=5)
-       0) Exit
-    Enter a number: 1
+#### Default: Select two configs, the backupdir and verbose output
 
-    You selected the disk with UUID 7360922b-c916-4d9f-a670-67fe0b91143c, subovolid=5.
-    The disk is mounted at /mnt.
+    # snap-sync --verbose --config root --config data2 --backupdir=toshiba_r700
 
-    Initial configuration...
+#### Dry-run: Select config, select Target, as batchjob (--noconfirm)
 
-    Creating new snapshot for home...
-    Will backup /home/.snapshots/4196/snapshot to /mnt/acer-c720/home/4196//snapshot
-    Continue with backup [Y/n]?
+    # snap-sync  -c root -s 265 --noconfirm --dry-run
 
-    Creating new snapshot for root...
-    Will backup //.snapshots/8455/snapshot to /mnt/acer-c720/root/8455//snapshot
-    Continue with backup [Y/n]?
 
-    Performing backups...
+### Snap-sync to remote host
 
-    Sending incremental snapshot for home...
-    At subvol /home/.snapshots/4196/snapshot
-    At snapshot snapshot
-    Modifying data for old snapshot for home...
-    Tagging new snapshot as latest backup for home...
+`snap-sync` will rely on ssh access to the target host. For batch usage make sure, that your
+public key is accepted for remote login as user 'root'. You may have to adapt /root/.ssh/authorized_keys
+on the target host.
 
-    Sending incremental snapshot for root...
-    At subvol //.snapshots/8455/snapshot
-    At snapshot snapshot
-    Modifying data for old snapshot for root...
-    Tagging new snapshot as latest backup for root...
+On your target host, you should also verify the availability of a snap-sync config-template for snapper.
+A template `snap-sync` is included in the package for your convenience.
 
-    Done!
+#### Dryrun: Select remote host <ip/fqdn>, interactive, run for all configs
 
-The related snapshots from this on the local machine are for `home`:
+    snap-sync --dry-run --remote 172.16.0.3
+	Selecting a mounted BTRFS device for backups on 172.16.0.3.
+	  0) / (uuid=5af3413e-59ea-4862-8cff-304afe25420f,subvolid=257,subvol=/root)
+	  1) /.snapshots (uuid=5af3413e-59ea-4862-8cff-304afe25420f,subvolid=258,subvol=/@snapshots-root)
+	  2) /data2 (uuid=62a45211-9197-4a5f-aeaf-0ab803a42c32,subvolid=261,subvol=/data2)
+	  3) /home (uuid=62a45211-9197-4a5f-aeaf-0ab803a42c32,subvolid=258,subvol=/home)
+	  4) /data2/.snapshots (uuid=62a45211-9197-4a5f-aeaf-0ab803a42c32,subvolid=262,subvol=/@snapshots-data2)
+	  5) /home/.snapshots (uuid=62a45211-9197-4a5f-aeaf-0ab803a42c32,subvolid=259,subvol=/@snapshots-home)
+	  6) /var/lib/machines (uuid=2ba04452-74aa-44df-b1c7-74e0a70c6543,subvolid=260,subvol=/machines)
+	  7) /var/lib/libvirt (uuid=2ba04452-74aa-44df-b1c7-74e0a70c6543,subvolid=261,subvol=/libvirt)
+	  8) /data (uuid=2ba04452-74aa-44df-b1c7-74e0a70c6543,subvolid=257,subvol=/data)
+	  9) /var/lib/machines/.snapshots (uuid=2ba04452-74aa-44df-b1c7-74e0a70c6543,subvolid=2121,subvol=/@snapshots-machines)
+	 10) /data/.snapshots (uuid=2ba04452-74aa-44df-b1c7-74e0a70c6543,subvolid=258,subvol=/@snapshots-data)
+	 11) /var/lib/snap-sync (uuid=753eba7a-41ce-49e0-b2e3-24ee07811efd,subvolid=420,subvol=/snap-sync)
+	  x) Exit
+    Enter a number: 11
 
-    single | 4196 |       | Sat 11 Nov 2017 01:37:44 PM EST | root |          | latest incremental backup | backupdir=acer-c720, subvolid=5, uuid=7360922b-c916-4d9f-a670-67fe0b91143c
 
-and for `root`:
+### Dry-run with given Target for snapper config 'home', no confirmations
 
-    single | 8455 |       | Sat 11 Nov 2017 01:37:46 PM EST | root |          | latest incremental backup | backupdir=acer-c720, subvolid=5, uuid=7360922b-c916-4d9f-a670-67fe0b91143c
+#### Sync: Select config 'data2', remote host <ip/fqdn>, target '/data', as batchjob (--noconfirm)
 
-As you can see the userdata column for snapper is used to keep track of these
-snapshots for the next time the script is run so that only the changes will need
-to be sent.
-
-### With UUID and subvolid specified and no confirmations
-
-    # snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
-
-    You selected the disk with UUID 7360922b-c916-4d9f-a670-67fe0b91143c, subovolid=5.
-    The disk is mounted at /mnt.
-
-    Initial configuration...
-
-    Creating new snapshot for home...
-    Will backup /home/.snapshots/4197/snapshot to /mnt/acer-c720/home/4197//snapshot
-
-    Creating new snapshot for root...
-    Will backup //.snapshots/8456/snapshot to /mnt/acer-c720/root/8456//snapshot
-
-    Performing backups...
-
-    Sending incremental snapshot for home...
-    At subvol /home/.snapshots/4197/snapshot
-    At snapshot snapshot
-    Modifying data for old snapshot for home...
-    Tagging new snapshot as latest backup for home...
-
-    Sending incremental snapshot for root...
-    At subvol //.snapshots/8456/snapshot
-    At snapshot snapshot
-    Modifying data for old snapshot for root...
-    Tagging new snapshot as latest backup for root...
-
-    Done!
+    # snap-sync --config data2 --remote 172.16.0.3 --target /data --noconfirm
 
 ## systemd example
 
-## service
+### service
 
     [Unit]
-    Description=Run snap-sync backup 
+    Description=Run snap-sync backup
 
     [Install]
     WantedBy=multi-user.target
@@ -155,7 +150,7 @@ to be sent.
     Type=simple
     ExecStart=/usr/bin/snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
 
-## timer
+### timer
 
     [Unit]
     Description=Run snap-sync weekly
@@ -168,7 +163,60 @@ to be sent.
     [Install]
     WantedBy=timers.target
 
+## snapper template
+
+	###
+	# template for snap-sync handling
+	###
+
+	# subvolume to snapshot
+	SUBVOLUME="/var/lib/snap-sync"
+
+	# filesystem type
+	FSTYPE="btrfs"
+
+	# users and groups allowed to work with config
+	ALLOW_USERS=""
+	ALLOW_GROUPS="adm"
+
+	# sync users and groups from ALLOW_USERS and ALLOW_GROUPS to .snapshots
+	# directory
+	SYNC_ACL="yes"
+
+	# start comparing pre- and post-snapshot in background after creating
+	# post-snapshot
+	BACKGROUND_COMPARISON="yes"
+
+	# run daily number cleanup
+	NUMBER_CLEANUP="no"
+
+	# limit for number cleanup
+	NUMBER_MIN_AGE="1800"
+	NUMBER_LIMIT="10"
+	NUMBER_LIMIT_IMPORTANT="2"
+
+	# use systemd.timer for timeline
+	TIMELINE_CREATE="no"
+
+	# use systemd.timer for cleanup
+	TIMELINE_CLEANUP="no"
+
+    # snap-sync as timer unit
+    SNAP_SYNC_EXCLUDE="yes"
+
 ## Contributing
 
 Help wanted! Feel free to fork and issue a pull request to add features or
 tackle an open issue.
+
+## License
+
+<!-- License source -->
+[Logo-CC_BY]: https://i.creativecommons.org/l/by/4.0/88x31.png "Creative Common Logo"
+[License-CC_BY]: https://creativecommons.org/licenses/by/4.0/legalcode "Creative Common License"
+
+This work is licensed under a [Creative Common License 4.0][License-CC_BY]
+
+![Creative Common Logo][Logo-CC_BY]
+
+© 2016, 2017 James W. Barnett, Ralf Zerres
