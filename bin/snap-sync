@@ -273,17 +273,39 @@ parse_params () {
 		fi
 		shift 2
 		;;
-            -d|--description|--description-finished)
-		description="$2"
-		shift 2
+            --description-finished)
+		shift
+		snap_description_finished="${*}"
+		snap_description_finished="${snap_description_finished%% -*}"
+		params=$*
+		set -- $snap_description_finished
+		count=$#
+		set -- $params
+		shift $count
 		;;
             --description-running)
-		description="$2"
-		shift 2
+		shift
+		snap_description_running=${*}
+		snap_description_running="${snap_description_running%% -*}"
+		params=$*
+		set -- $snap_description_running
+		count=$#
+		set -- $params
+		shift $count
 		;;
-            --description-synced)
-		description="$2"
-		shift 2
+            -d|--description|--description-synced)
+		shift
+		snap_description_synced="${*}"
+		snap_description_synced="${snap_description_synced%% -*}"
+		params=$*
+		set -- $snap_description_synced
+		count=$#
+		set -- $params
+		shift $count
+		;;
+	    --dry-run)
+		dryrun=1
+		shift 1
 		;;
             -i|--interactive)
 		interactive=1
@@ -294,6 +316,10 @@ parse_params () {
 		batch=1
 		donotify=0
 		shift
+		;;
+	    --remote)
+		remote=$2
+		shift 2
 		;;
             -s|--subvolid|--SUBVOLID)
 		subvolid_cmdline="$2"
@@ -311,6 +337,10 @@ parse_params () {
 		verbose=1
 		shift 1
 		;;
+            --version)
+		printf "%s v%s\n" "$progname" "$version"
+		exit 0
+		;;
 	    --backupdir=*)
                 backupdir_cmdline=${1#*=}
                 shift
@@ -323,13 +353,41 @@ parse_params () {
 		fi
 		shift
                 ;;
-	    --dry-run)
-		dryrun=1
-		shift 1
+            --description-finished=*)
+		snap_description_finished="${*#*=}"
+		snap_description_finished="${snap_description_finished%% -*}"
+		params_new=${*#*=}
+		params_new=${params_new##${snap_description_finished}}
+		if [ ${#params_new} -gt 0 ]; then
+		    set -- $snap_description_finished
+		    count=$#
+		    set -- $params_new
+		fi
 		;;
-	    --remote)
-		remote=$2
-		shift 2
+            --description-running=*)
+		snap_description_running="${*#*=}"
+		snap_description_running="${snap_description_running%% -*}"
+		params_new=${*#*=}
+		params_new=${params_new##${snap_description_running}}
+		params=$#
+		if [ ${#params_new} -gt 0 ]; then
+		    set -- $snap_description_running
+		    count=$#
+		    set -- $params_new
+		fi
+		;;
+            -d=*|--description=*|--description-synced=*)
+		snap_description_synced="${*#*=}"
+		snap_description_synced="${snap_description_synced%% -*}"
+		params_new=${*#*=}
+		params_new=${params_new##${snap_description_synced}}
+		if [ ${#params_new} -gt 0 ]; then
+		    set -- $snap_description_synced
+		    count=$#
+		    set -- $params_new
+		else
+		    break
+		fi
 		;;
 	    --remote=*)
                 remote=${1#*=}
@@ -366,9 +424,9 @@ parse_params () {
     . $SNAPPER_CONFIG
     selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
 
-    snap_description_synced=${description_lastsync:-"snap-sync last incremental"}
-    snap_description_finished=${description_finished:-"snap-sync backup"}
-    snap_description_running=${description_running:-"snap-sync in progress"}
+    snap_description_finished=${snap_description_finished:-"snap-sync backup"}
+    snap_description_running=${snap_description_running:-"snap-sync in progress"}
+    snap_description_synced=${snap_description_synced:-"snap-sync last incremental"}
 
     uuid_cmdline=${uuid_cmdline:-"none"}
     target_cmdline=${target_cmdline:-"none"}
@@ -394,8 +452,8 @@ parse_params () {
 
 	printf "Snapper Descriptions\n"
 	printf "  backup finished:  '%s'\n" "$snap_description_finished"
-	printf "  backup synced:    '%s'\n" "$snap_description_synced"
 	printf "  backup running:   '%s'\n" "$snap_description_running"
+	printf "  backup synced:    '%s'\n" "$snap_description_synced"
 
 	if [ "$verbose" ]; then snap_sync_options="verbose=true"; fi
 	if [ "$dryrun" ]; then snap_sync_options="${snap_sync_options} dry-run=true"; fi
@@ -965,22 +1023,26 @@ $progname $version
 Usage: $progname [options]
 
 Options:
- -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
- -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper
-                          configuration. Can list multiple configurations within quotes, space-separated
-                          (e.g. -c "root home").
- -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
-     --batch              directory name on first backup"
- -s, --subvolid <subvlid> Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
- -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt."
-                          If multiple mount points are found with the same UUID, will prompt user."
- -t, --TARGET <target>    Specify the mountpoint of the BTRFS subvolume to back up to.
-     --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
-                          should specify the remote machine's hostname or ip address. The 'root' user must be
-                          permitted to login on the remote machine.
-     --dry-run            perform a trial run where no changes are made.
- -v, --verbose            Be more verbose on what's going on.
-
+ -d, --description <desc>    Change the snapper description. Default: "latest incremental backup"
+     --label-finished <desc> snapper description tagging successful jobs. Default: "snap-sync backup"
+     --label-running <desc>  snapper description tagging active jobs. Default: "snap-sync in progress" 
+     --label-synced <desc>   snapper description tagging last synced jobs. 
+                             Default: "snap-sync last incremental"
+ -c, --config <config>       Specify the snapper configuration to use. Otherwise will perform for each snapper
+                             configuration. Can list multiple configurations within quotes, space-separated
+                             (e.g. -c "root home").
+ -n, --noconfirm             Do not ask for confirmation for each configuration. Will still prompt for backup
+     --batch                 directory name on first backup"
+ -s, --subvolid <subvlid>    Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
+ -u, --uuid <UUID>           Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt."
+                             If multiple mount points are found with the same UUID, will prompt user."
+ -t, --target <target>       Specify the mountpoint of the BTRFS subvolume to back up to.
+     --remote <address>      Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
+                             should specify the remote machine's hostname or ip address. The 'root' user must be
+                             permitted to login on the remote machine.
+     --dry-run               perform a trial run where no changes are made.
+ -v, --verbose               Be more verbose on what's going on.
+     --version		     show program version 
 EOF
 
   exit 1
@@ -1100,9 +1162,10 @@ ssh=""
 #trap 'traperror ${LINENO} $?' ERR
 trap trapkill TERM INT
 
-parse_params $@
-
 check_prerequisites
+
+# validate commandline options, set resonable defaults
+parse_params $@
 
 # read mounted BTRFS structures
 get_disk_infos
