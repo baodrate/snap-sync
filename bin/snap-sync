@@ -323,7 +323,7 @@ for x in $selected_configs; do
         read -r -p "Enter name of subvolume to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
         printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
         BACKUPDIR="$selected_mnt/$mybackupdir"
-        $ssh subvolume create "$BACKUPDIR"
+        $ssh test -d "$BACKUPDIR" || $ssh btrfs subvolume create "$BACKUPDIR"
     else
         mybackupdir=$(snapper -c "$x" list -t single | awk -F"|" '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
