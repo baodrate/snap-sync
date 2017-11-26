@@ -189,8 +189,8 @@ if [[ -n $remote ]]; then
     fi
 fi
 
-if [[ "$(findmnt -n -v --target / -o FSTYPE)" == "btrfs" ]]; then
-    EXCLUDE_UUID=$(findmnt -n -v -t btrfs --target / -o UUID)
+if [[ "$($ssh findmnt -n -v --target / -o FSTYPE)" == "btrfs" ]]; then
+    EXCLUDE_UUID=$($ssh findmnt -n -v -t btrfs --target / -o UUID)
     TARGETS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $2}')
     UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $1}')
 else
@@ -204,7 +204,7 @@ declare -a SUBVOLIDS_ARRAY
 
 i=0
 for x in $TARGETS; do
-    SUBVOLIDS_ARRAY[$i]=$(btrfs subvolume show $x | awk '/Subvolume ID:/ { print $3 }')
+    SUBVOLIDS_ARRAY[$i]=$($ssh btrfs subvolume show $x | awk '/Subvolume ID:/ { print $3 }')
     TARGETS_ARRAY[$i]=$x
     i=$((i+1))
 done
