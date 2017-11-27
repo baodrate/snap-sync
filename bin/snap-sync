@@ -110,9 +110,10 @@ Options:
  -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
                           If multiple mount points are found with the same UUID, will prompt user.
  -s, --subvolid <subvlid> Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
- --remote <address>       Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You 
-                          should specify the remote machine's hostname or ip address. The 'root' user must be 
+ -r, --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
+                          should specify the remote machine's hostname or ip address. The 'root' user must be
                           permitted to login on the remote machine.
+ -p, --port <port>        The remote port.
 EOF
 }
 
@@ -145,9 +146,12 @@ while [[ $# -gt 0 ]]; do
             usage
             exit 1
         ;;
-	    --remote)
+	    -r|--remote)
             remote=$2
-            ssh="ssh $remote"
+            shift 2
+	    ;;
+	    -p|--port)
+            port=$2
             shift 2
 	    ;;
         *)
@@ -165,21 +169,28 @@ subvolid_cmdline=${subvolid_cmdline:-"5"}
 noconfirm=${noconfirm:-"no"}
 
 if [[ "$uuid_cmdline" != "none" ]]; then
-    if [[ -z $ssh ]]; then
+    if [[ -z $remote ]]; then
         notify_info "Backup started" "Starting backups to $uuid_cmdline subvolid=$subvolid_cmdline..."
     else
         notify_info "Backup started" "Starting backups to $uuid_cmdline subvolid $subvolid_cmdline at $remote..."
     fi
 else
-    if [[ -z $ssh ]]; then
+    if [[ -z $remote ]]; then
         notify_info "Backup started" "Starting backups. Use command line menu to select disk."
     else
         notify_info "Backup started" "Starting backups. Use command line menu to select disk on $remote."
     fi
 fi
 
-if [[ "$(findmnt -n -v --target / -o FSTYPE)" == "btrfs" ]]; then
-    EXCLUDE_UUID=$(findmnt -n -v -t btrfs --target / -o UUID)
+if [[ -n $remote ]]; then
+    ssh="ssh $remote"
+    if [[ -n $port ]]; then
+        ssh="$ssh -p $port"
+    fi
+fi
+
+if [[ "$($ssh findmnt -n -v --target / -o FSTYPE)" == "btrfs" ]]; then
+    EXCLUDE_UUID=$($ssh findmnt -n -v -t btrfs --target / -o UUID)
     TARGETS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $2}')
     UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $1}')
 else
@@ -193,7 +204,7 @@ declare -a SUBVOLIDS_ARRAY
 
 i=0
 for x in $TARGETS; do
-    SUBVOLIDS_ARRAY[$i]=$(btrfs subvolume show $x | awk '/Subvolume ID:/ { print $3 }')
+    SUBVOLIDS_ARRAY[$i]=$($ssh btrfs subvolume show $x | awk '/Subvolume ID:/ { print $3 }')
     TARGETS_ARRAY[$i]=$x
     i=$((i+1))
 done
@@ -323,7 +334,7 @@ for x in $selected_configs; do
         read -r -p "Enter name of subvolume to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
         printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
         BACKUPDIR="$selected_mnt/$mybackupdir"
-        $ssh subvolume create "$BACKUPDIR"
+        $ssh test -d "$BACKUPDIR" || $ssh btrfs subvolume create "$BACKUPDIR"
     else
         mybackupdir=$(snapper -c "$x" list -t single | awk -F"|" '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
@@ -428,10 +439,14 @@ for x in $selected_configs; do
         snapper -v -c "$x" modify -d "old snap-sync snapshot (you may remove)" -u "backupdir=,subvolid=,uuid=" -c "number" "$old_num"
     fi
 
-    if [[ -z $ssh ]]; then
+    if [[ -z $remote ]]; then
         cp "$new_info" "$backup_location"
     else
-        rsync -avzq "$new_info" "$remote":"$backup_location"
+        if [[ -z $port ]]; then
+            rsync -avzq "$new_info" "$remote":"$backup_location"
+        else
+            rsync -avzqe "ssh -p $port" "$new_info" "$remote":"$backup_location"
+        fi
     fi
 
     # It's important not to change this userdata in the snapshots, since that's how
