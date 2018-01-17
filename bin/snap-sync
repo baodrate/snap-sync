@@ -48,7 +48,7 @@ BTRFS_PIPE=$TMPDIR_PIPE/btrfs.out
 exec 3>$PIPE 4>$BTRFS_PIPE
 
 # global variables
-donotify=no
+donotify=false
 answer=no
 disk_count=-1
 disk_uuid_match_count=0
@@ -77,8 +77,8 @@ check_prerequisites () {
     which wc >/dev/null 2>&1 || { printf "'wc' is not installed." && exit 1; }
 
     # optional binaries:
-    which notify-send >/dev/null 2>&1 && { donotify=yes; }
-    which pv >/dev/null 2>&1 && { do_pv_cmd=1; }
+    which notify-send >/dev/null 2>&1 && { donotify=true; }
+    which pv >/dev/null 2>&1 && { do_pv_cmd=true; }
 
     if [ $(id -u) -ne 0 ] ; then printf "Script must be run as root\n" ; exit 1 ; fi
 
@@ -234,7 +234,7 @@ get_config(){
 
 notify () {
     # estimation: batch calls should just log
-    if [ "$donotify" = "yes" ]; then
+    if [ "$donotify" = "true" ]; then
 	for u in $(users | sed 's/ /\n/' | sort -u); do
             sudo -u $u DISPLAY=:0 \
 		 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
@@ -310,12 +310,13 @@ parse_params () {
 		;;
             -i|--interactive)
 		interactive=1
-		donotify=yes
+		donotify=true
 		shift
 		;;
             -n|--noconfirm|--batch)
 		batch=1
-		donotify=no
+		do_pv_cmd=false
+		donotify=false
 		shift
 		;;
 	    --remote)
@@ -458,7 +459,7 @@ parse_params () {
 
 	if [ "$verbose" ]; then snap_sync_options="verbose=true"; fi
 	if [ "$dryrun" ]; then snap_sync_options="${snap_sync_options} dry-run=true"; fi
-	if [ "$batch" ]; then snap_sync_options="${snap_sync_options} batch=true"; fi
+	if [ "$batch" ]; then snap_sync_options="${snap_sync_options} batch=true do_pv_cmd=false" ; fi
 	if [ "$interactive" ]; then snap_sync_options="${snap_sync_options} interactive=true batch=false"; fi
 	printf "Options:            '%s'\n" "${snap_sync_options}"
     fi
@@ -691,7 +692,7 @@ run_backup () {
 	snapper_target_snapshot_size=$(du --sum $snapper_new_snapshot 2>/dev/null | awk -F ' ' '{print $1}')
 
 	# settings for interactive progress status
-	if [ $do_pv_cmd ]; then
+	if [ "$do_pv_cmd" == "true" ]; then
 	    pv_options="--delay-start 2  --interval 5 --timer --rate --bytes --fineta --progress"
 	    cmd_pv="pv $pv_options --size $snapper_target_snapshot_size |"
 	    #cmd_pv="pv $pv_options --size $snapper_target_snapshot_size | dialog --gauge \"$progname: Progress for config '$selected_config'\" 6 85 |"
