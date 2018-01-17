@@ -59,6 +59,7 @@ selected_uuid='none'
 selected_target='none'
 selected_subvol='none'
 snapper_snapshots=".snapshots"  # hardcoded in snapper
+snapper_snapsync_template="snap-sync"
 
 ###
 # functions
@@ -217,7 +218,7 @@ get_answer_yes_no () {
 }
 
 get_config(){
-    local config=${1:-/etc/snapper/config-templates/snap-sync}
+    local config=${1:-/etc/snapper/config-templates/"$snapper_snapsync_template"}
     local config_key=${2:-SUBVOLUME}
 
 #    IFS="="
@@ -993,7 +994,7 @@ select_target_disk () {
 }
 
 set_config(){
-    local config=${1:-/etc/snapper/config-templates/snap-sync}
+    local config=${1:-/etc/snapper/config-templates/"$snapper_snapsync_template"}
     local config_key=${2:-SUBVOLUME}
     local config_value=${3:-/var/lib/snap-sync}
 
@@ -1074,22 +1075,22 @@ verify_snapper_structure () {
     # verify that we have a snapper compatible structure for selected config on target
     if $ssh [ ! -d $backup_root/$snapper_config ]; then
 	if $ssh [ ! -f $SNAPPER_TEMPLATES/snap-sync ]; then
-	    printf "A snapper template %s to configure the snapper subvolume %s is missing in %s.\n" "snap-sync" "$snapper_config" "$SNAPPER_TEMPLATES"
-	    printf "Did you miss to install the snap-sync's default snapper template?\n"
-	    die "snapper template %s to configure the snapper subvolume %s is missing in %s.\n" "snap-sync" "$snapper_config" "$SNAPPER_TEMPLATES"
+	    printf "A snapper template %s to configure the snapper subvolume %s is missing in %s on %s.\n" "$snapper_snapsync_template" "$snapper_config" "$SNAPPER_TEMPLATES" "$remote_host"
+	    printf "Did you miss to install the snap-sync's default snapper template on %s?\n" "$remote"
+	    die "snapper template %s to configure the snapper subvolume %s is missing in %s on %s.\n" "$snapper_snapsync_template" "$snapper_config" "$SNAPPER_TEMPLATES" "$remote_host"
 	fi
 	if [ ! "$dryrun" ]; then
 	    if [ "$verbose" ]; then
-		printf "Create new snapper capable subvolume in '%s' ...\n"  "$backup_root/$snapper_config"
+		printf "Create new snapper capable subvolume in '%s:%s' ...\n"  "$remote_host" "$backup_root/$snapper_config"
 	    fi
 
 	    # notify if SUBVOLUME has changed
 	    create_config="btrfs subvolume create $backup_root/$snapper_config"
-	    $ssh $create_config || die "Snapper structure for config %s to hold target snapshots could not be created in directory on %s.\n" "$snapper_config" "$backup_root"
+	    $ssh $create_config || die "Snapper structure for config %s to hold target snapshots could not be created in directory on %s on %s.\n" "$snapper_config" "$backup_root" "$remote_host"
 
 	    if $ssh [ ! -f /etc/snapper/configs/$snapper_config ]; then
 		# snapper-logic will create $backup_root/$snapper_config/.snapshots
-		$ssh snapper --config $snapper_config create-config --template snap-sync $backup_root/$snapper_config
+		$ssh snapper create-config $snapper-config --template $snapper_snapsync_template $backup_root/$snapper_config
 	    else
 		# if changed, adapt targets SUBVOLUME in given config
 		#get_config "/etc/snapper/configs/$snapper_config" "SUBVOLUME"
@@ -1102,13 +1103,22 @@ verify_snapper_structure () {
 	    fi
 	    $ssh chmod 0700 $backup_root/$snapper_config
 	    sync
+	    if $ssh [ ! -d $backup_root/$snapper_subvol ]; then
+		create_subvol="btrfs subvolume create $backup_root/$snapper_subvol"
+		if $ssh [ $create_subvol ]; then
+		    if [ $verbose ]; then
+		    printf "Created BTRFS subvolume %s.\n" "$backup_root/$snapper_subvol"
+		    fi
+		else
+		    die "Create BTRFS subvolume to hold snapshots on remote failed."
+		fi
+	    fi
+	    $ssh snapper --config $snapper_subvol create-config --template $snapper_snapsync_template $backup_root/$snapper_subvol
+	    $ssh chmod 0700 $backup_root/$snapper_subvol
 	else
-	    printf "dryrun: Would create new snapper structure in '%s' ...\n"  "$backup_root/$snapper_config"
+	    printf "dryrun: Would create new snapper structure in '%s:%s' ...\n"  "$backup_root/$snapper_config"
+	    printf "dryrun: Would create new snapper configuration from template %s ...\n" "$snapper_snapsync_template"
 	fi
-	create_subvol="btrfs subvolume create $backup_root/$snapper_subvol"
-	$ssh $create_subvol || die "BTRFS subvolume %s to hold snapshots for config %s could not be created in directory on %s.\n" "$snapper_subvol" "$snapper_config" "$backup_root"
-	$ssh snapper --config $snapper_subvol create-config --template snap-sync $backup_root/$snapper_subvol
-	$ssh chmod 0700 $backup_root/$snapper_subvol
     else
 	cmd="$ssh stat --format=%i $backup_root/$snapper_config"
 	if [ $(eval $cmd) -ne 256 ]; then
