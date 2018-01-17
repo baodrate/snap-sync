@@ -470,36 +470,36 @@ run_config () {
 
     printf "\nVerify configuration...\n"
 
+    SNAP_SYNC_EXCLUDE=no
     # loop though selected snapper configurations
     # Pseudo Arrays $i -> store associated elements of selected_config
     i=0
     for selected_config in $selected_configs; do
-	count=$(eval snapper --config $selected_config list --type single | \
-		    awk '/'"$snap_description_synced"'/' | \
-		    awk '/subvolid='"$selected_subvol"'/, /uuid='"$selected_uuid"'/ {cnt++} END {print cnt}')
-	if [ -n "$count" ] && [ "$count" -gt 1 ]; then
-	    printf "%s entries are marked as '%s' for snapper config '%s'\n" \
-		   "$count" "$snap_description_synced" "$selected_config" | tee PIPE
-	    printf "Pointing to target with UUID '%s' and SUBVOLID '%s'. Skipping configuration '%s'.\n" \
-		   "$selected_uuid" "$selected_subvol" "$selected_config"
-	    printf "Please cleanup for further processing.\n" | tee PIPE
-	    error "Skipping configuration $selected_config."
-	    selected_configs=$(echo $selected_configs | sed -e "s/\($selected_config*\)//")
-	    continue
-	fi
-
-	# cleanup failed former runs
-	check_snapper_failed_ids $batch
-
-	SNAP_SYNC_EXCLUDE=no
-	if [ -f "/etc/snapper/configs/$selected_config" ]; then
+	# only process existing snap-sync configurations
+	if [ ! -f "/etc/snapper/configs/$selected_config" ]; then
+	    die "Selected snapper configuration '$selected_config' does not exist."
+	else
 	    . /etc/snapper/configs/$selected_config
 	    if [ "$SUBVOLUME" = "/" ]; then
 		SUBVOLUME=''
 	    fi
-	else
-	    die "Selected snapper configuration $selected_config does not exist."
+	    count=$(eval snapper --config $selected_config list --type single | \
+		    awk '/'"$snap_description_synced"'/' | \
+		    awk '/subvolid='"$selected_subvol"'/, /uuid='"$selected_uuid"'/ {cnt++} END {print cnt}')
+	    if [ -n "$count" ] && [ "$count" -gt 1 ]; then
+		printf "%s entries are marked as '%s' for snapper config '%s'\n" \
+		       "$count" "$snap_description_synced" "$selected_config" | tee PIPE
+		printf "Pointing to target with UUID '%s' and SUBVOLID '%s'. Skipping configuration '%s'.\n" \
+		       "$selected_uuid" "$selected_subvol" "$selected_config"
+		printf "Please cleanup for further processing.\n" | tee PIPE
+		error "Skipping configuration $selected_config."
+		selected_configs=$(echo $selected_configs | sed -e "s/\($selected_config*\)//")
+		continue
+	    fi
 	fi
+
+	# cleanup failed former runs
+	check_snapper_failed_ids $batch
 
 	if [ $SNAP_SYNC_EXCLUDE = "yes" ]; then
 	    continue
@@ -688,7 +688,7 @@ run_backup () {
 	snapper_target_config=$(eval echo \$snapper_target_config_$i)
 	snapper_target_snapshot=$(eval echo \$snapper_target_snapshot_$i)
 
-	verify_snapper_structure "backup_root=$backup_root" "snapper_target_config=$snapper_target_config" "snapper_new_id=$snapper_new_id"
+	verify_snapper_structure "backup_root=$backup_root" "snapper_target_config=$snapper_target_config" "snapper_new_id=$snapper_new_id" "remote=$remote"
 
 	snapper_target_snapshot_size=$(du --sum $snapper_new_snapshot 2>/dev/null | awk -F ' ' '{print $1}')
 
@@ -1056,20 +1056,21 @@ verify_snapper_structure () {
     local backup_root=${1##backup_root=}
     local snapper_config=${2##snapper_target_config=}
     local snapper_id=${3##snapper_new_id=}
+    local remote_host=${4##remote=}
 
     if [ "$verbose" ]; then
-	printf "Verify snapper filesystem structure on target ...\n"
+	printf "Verify snapper filesystem structure on target %s...\n" "$remote"
     fi
 
     # if not accessible, create backup-path
     if $ssh [ ! -d $backup_root ]; then
 	if [ ! "$dryrun" ]; then
 	    if [ "$verbose" ]; then
-		printf "Create backup-path %s ...\n" "$backup_root"
+		printf "Create backup-path %s:%s ...\n" "$remote_host" "$backup_root"
 	    fi
 	    $ssh mkdir --mode=0700 --parents $backup_root
 	else
-	    printf "dryrun: Would create backup-path $backup_root %s ...\n" "$backup_root"
+	    printf "dryrun: Would create backup-path %s:%s ...\n" "$remote_host" "$backup_root"
 	fi
     fi
 
