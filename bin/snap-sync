@@ -264,9 +264,9 @@ parse_params () {
                 usage
                 ;;
             -b|--backupdir)
-		backupdir_cmdline="$2"
-		shift 2
-		;;
+                backupdir_cmdline="$2"
+                shift 2
+                ;;
             -c|--config)
 		if [ ${#selected_config} -gt 0 ]; then
                     selected_configs="${selected_configs} ${2}"
@@ -400,11 +400,11 @@ parse_params () {
                 subvolid_cmdline=${1#*=}
                 shift
                 ;;
-	    --target=*|TARGET=*)
+	    --target=*|--TARGET=*)
                 target_cmdline=${1#*=}
                 shift
                 ;;
-	    --uuid=*|UUID=*)
+	    --uuid=*|--UUID=*)
                 uuid_cmdline=${1#*=}
                 shift
                 ;;
@@ -1026,6 +1026,7 @@ $progname $version
 Usage: $progname [options]
 
 Options:
+ -b, --backupdir <prefix>    backupdir is a relative path that will be appended to target backup-root
  -d, --description <desc>    Change the snapper description. Default: "latest incremental backup"
      --label-finished <desc> snapper description tagging successful jobs. Default: "snap-sync backup"
      --label-running <desc>  snapper description tagging active jobs. Default: "snap-sync in progress" 
