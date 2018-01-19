@@ -320,6 +320,10 @@ parse_params () {
 		donotify=false
 		shift
 		;;
+	    --nonotify)
+		donotify=false
+		shift 1
+		;;
             -p|--port)
 		port=$2
 		shift 2
@@ -444,10 +448,13 @@ parse_params () {
     subvolid_cmdline=${subvolid_cmdline:-"none"}
     backupdir_cmdline=${backupdir_cmdline:-"none"}
 
-    if [ -z $remote ]; then
+    if [ -z "$remote" ]; then
 	ssh=""
     else
 	ssh="ssh $remote"
+	if [ ! -z "$port" ]; then
+           ssh="$ssh -p $port"
+        fi
     fi
 
     if [ "$verbose" ]; then
@@ -470,6 +477,7 @@ parse_params () {
 	if [ "$verbose" ]; then snap_sync_options="verbose=true"; fi
 	if [ "$dryrun" ]; then snap_sync_options="${snap_sync_options} dry-run=true"; fi
 	if [ "$batch" ]; then snap_sync_options="${snap_sync_options} batch=true do_pv_cmd=false" ; fi
+	if [ "$nonotify" ]; then snap_sync_options="${snap_sync_options} donotify=false"; fi
 	if [ "$interactive" ]; then snap_sync_options="${snap_sync_options} interactive=true batch=false"; fi
 	printf "Options:            '%s'\n" "${snap_sync_options}"
     fi
@@ -677,8 +685,10 @@ run_backup () {
 
 	cont_backup=$(eval echo \$snapper_activate_$i)
 	if [ "$cont_backup" = "no" ] || [ "$SNAP_SYNC_EXCLUDE" = "yes" ]; then
-            notify_info "Backup in progress" "NOTE: Skipping '$selected_config' configuration."
-            continue
+	    if [ "$donotify" ]; then
+		notify_info "Backup in progress" "NOTE: Skipping '$selected_config' configuration."
+            fi
+	    continue
 	fi
 
 	notify_info "Backup in progress" "Backing up data for configuration '$selected_config'."
@@ -820,12 +830,15 @@ run_finalize () {
 
 	cont_backup=$(eval echo \$snapper_activate_$i)
 	if [ "$cont_backup" = "no" ] || [ "$SNAP_SYNC_EXCLUDE" = "yes" ]; then
-            notify_info "Finalize backup" "NOTE: Skipping '$selected_config' configuration."
-            continue
+	    if [ "$donotify" ]; then
+	       notify_info "Finalize backup" "NOTE: Skipping '$selected_config' configuration."
+            fi
+	    continue
 	fi
 
-	notify_info "Finalize backup" "Cleanup tasks for configuration '$selected_config'."
-
+	if [ "$donotify" ]; then
+	    notify_info "Finalize backup" "Cleanup tasks for configuration '$selected_config'."
+	fi
 	printf "\n"
 
 	# retrieve config specific infos from pseudo Arrays
@@ -1055,6 +1068,7 @@ Options:
                              (e.g. -c "root home").
  -n, --noconfirm             Do not ask for confirmation for each configuration. Will still prompt for backup
      --batch                 directory name on first backup"
+     --nonotify              Disable graphical notification (via dbus)
  -r, --remote <address>      Send the snapshot backup to a remote machine. The snapshot will be sent via ssh.
                              You should specify the remote machine's hostname or ip address. The 'root' user
                              must be permitted to login on the remote machine.
@@ -1205,23 +1219,25 @@ parse_params $@
 # read mounted BTRFS structures
 get_disk_infos
 
-if [ "$target_cmdline" != "none" ]; then
-    if [ -z "$remote" ]; then
-        notify_info "Backup started" "Starting backups to '$target_cmdline' ..."
+if [ "$donotify" ]; then
+    if [ "$target_cmdline" != "none" ]; then
+	if [ -z "$remote" ]; then
+            notify_info "Backup started" "Starting backups to '$target_cmdline' ..."
+	else
+            notify_info "Backup started" "Starting backups to '$target_cmdline'  at $remote ..."
+	fi
+    elif [ "$uuid_cmdline" != "none" ]; then
+	if [ -z "$remote" ]; then
+            notify_info "Backup started" "Starting backups to $uuid_cmdline..."
+	else
+            notify_info "Backup started" "Starting backups to $uuid_cmdline at $remote..."
+	fi
     else
-        notify_info "Backup started" "Starting backups to '$target_cmdline'  at $remote ..."
-    fi
-elif [ "$uuid_cmdline" != "none" ]; then
-    if [ -z "$remote" ]; then
-        notify_info "Backup started" "Starting backups to $uuid_cmdline..."
-    else
-        notify_info "Backup started" "Starting backups to $uuid_cmdline at $remote..."
-    fi
-else
-    if [ -z "$remote" ]; then
-        notify_info "Backup started" "Starting backups. Use command line menu to select disk."
-    else
-        notify_info "Backup started" "Starting backups. Use command line menu to select disk on $remote."
+	if [ -z "$remote" ]; then
+            notify_info "Backup started" "Starting backups. Use command line menu to select disk."
+	else
+            notify_info "Backup started" "Starting backups. Use command line menu to select disk on $remote."
+	fi
     fi
 fi
 
@@ -1250,8 +1266,10 @@ exec 3>&-
 # cleanup
 run_cleanup
 
-if [ "$uuid_cmdline" != "none" ]; then
-    notify_info "Finished" "Backups to $uuid_cmdline complete!"
-else
-    notify_info "Finished" "Backups complete!"
+if [ "$donotify" ]; then
+    if [ "$uuid_cmdline" != "none" ]; then
+	notify_info "Finished" "Backups to $uuid_cmdline complete!"
+    else
+	notify_info "Finished" "Backups complete!"
+    fi
 fi
