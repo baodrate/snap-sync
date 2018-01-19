@@ -476,8 +476,12 @@ parse_params () {
 
 	if [ "$verbose" ]; then snap_sync_options="verbose=true"; fi
 	if [ "$dryrun" ]; then snap_sync_options="${snap_sync_options} dry-run=true"; fi
-	if [ "$batch" ]; then snap_sync_options="${snap_sync_options} batch=true do_pv_cmd=false" ; fi
 	if [ "$nonotify" ]; then snap_sync_options="${snap_sync_options} donotify=false"; fi
+	if [ "$batch" ]; then
+            snap_sync_options="${snap_sync_options} batch=true do_pv_cmd=false"
+        else
+            snap_sync_options="${snap_sync_options} do_pv_cmd=$do_pv_cmd"
+	fi
 	if [ "$interactive" ]; then snap_sync_options="${snap_sync_options} interactive=true batch=false"; fi
 	printf "Options:            '%s'\n" "${snap_sync_options}"
     fi
@@ -712,8 +716,8 @@ run_backup () {
 	snapper_target_snapshot_size=$(du --sum $snapper_new_snapshot 2>/dev/null | awk -F ' ' '{print $1}')
 
 	# settings for interactive progress status
-	if [ "$do_pv_cmd" == "true" ]; then
-	    pv_options="--delay-start 2  --interval 5 --timer --rate --bytes --fineta --progress"
+	if [ "$do_pv_cmd" = "true" ]; then
+	    pv_options="--delay-start 2  --interval 5 --timer --rate --bytes --fineta --buffer-percent --progress"
 	    cmd_pv="pv $pv_options --size $snapper_target_snapshot_size |"
 	    #cmd_pv="pv $pv_options --size $snapper_target_snapshot_size | dialog --gauge \"$progname: Progress for config '$selected_config'\" 6 85 |"
 	else
@@ -879,11 +883,11 @@ run_finalize () {
 		printf "Tagging snapper metadata on target for configuration '%s' ...\n" "$selected_config" | tee $PIPE
 	    fi
 	    i=1
-	    max=20
+	    i_max=20
 	    cmd="snapper --verbose --config \"$snapper_target_config\" list --type single | awk '/'\"$snap_description_running\"'/' | awk -F '|' '\$1 == "$snapper_new_id" {print \$1}'"
 	    # !!! ugly hack !!!: wait for snapper to list target snapshot in database. how to trigger database resync?
 	    # it is not deterministic, when the entry in the listing will show up .... for now, wait max 10 min ...
-	    while [ "$i" -le  "$max" ]; do
+	    while [ "$i" -le  "$i_max" ]; do
 		if [ -n "$remote" ]; then
 		    ret=$($ssh $cmd)
 		else
@@ -1060,8 +1064,8 @@ Options:
  -b, --backupdir <prefix>    backupdir is a relative path that will be appended to target backup-root
  -d, --description <desc>    Change the snapper description. Default: "latest incremental backup"
      --label-finished <desc> snapper description tagging successful jobs. Default: "snap-sync backup"
-     --label-running <desc>  snapper description tagging active jobs. Default: "snap-sync in progress" 
-     --label-synced <desc>   snapper description tagging last synced jobs. 
+     --label-running <desc>  snapper description tagging active jobs. Default: "snap-sync in progress"
+     --label-synced <desc>   snapper description tagging last synced jobs.
                              Default: "snap-sync last incremental"
  -c, --config <config>       Specify the snapper configuration to use. Otherwise will perform for each snapper
                              configuration. Can list multiple configurations within quotes, space-separated
@@ -1082,7 +1086,7 @@ Options:
                              permitted to login on the remote machine.
      --dry-run               perform a trial run where no changes are made.
  -v, --verbose               Be more verbose on what's going on.
-     --version		     show program version 
+     --version		     show program version
 EOF
 
   exit 1
