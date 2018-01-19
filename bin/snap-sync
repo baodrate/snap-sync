@@ -127,9 +127,9 @@ get_disk_infos () {
     local fs_option
 
     # get mounted BTRFS infos
-    if [ "$(findmnt --noheadings --nofsroot --target / --output FSTYPE)" = "btrfs" ]; then
+    if [ "$($ssh findmnt --noheadings --nofsroot --target / --output FSTYPE)" = "btrfs" ]; then
 	# root filesystem is never seen as valid target location
-	exclude_uuid=$(findmnt --noheadings --nofsroot --types btrfs --target / --output UUID)
+	exclude_uuid=$($ssh findmnt --noheadings --nofsroot --types btrfs --target / --output UUID)
 	disk_uuids=$($ssh findmnt --noheadings --nofsroot --types btrfs --output UUID,TARGET --list | grep -v $exclude_uuid | awk '{print $1}')
 	disk_targets=$($ssh findmnt --noheadings --nofsroot --types btrfs --output UUID,TARGET --list | grep -v $exclude_uuid | awk '{print $2}')
 	fs_options=$($ssh findmnt --noheadings --nofsroot --types btrfs --output UUID,OPTIONS --list | grep -v $exclude_uuid | awk '{print $2}')
@@ -320,6 +320,10 @@ parse_params () {
 		donotify=false
 		shift
 		;;
+            -p|--port)
+		port=$2
+		shift 2
+		;;
 	    --remote)
 		remote=$2
 		shift 2
@@ -392,6 +396,10 @@ parse_params () {
 		    break
 		fi
 		;;
+            --port=*)
+                port=${1#*=}
+                shift
+                ;;
 	    --remote=*)
                 remote=${1#*=}
                 shift
@@ -451,7 +459,8 @@ parse_params () {
 	printf "  disk TARGET:      '%s'\n" "$target_cmdline"
 	printf "  disk SUBVOLID:    '%s'\n" "$subvolid_cmdline"
 	printf "  disk Backupdir:   '%s'\n" "$backupdir_cmdline"
-	printf "  remote host:      '%s'\n" "$ssh"
+	printf "  remote host:      '%s'\n" "$remote"
+	printf "  ssh options:      '%s'\n" "$ssh"
 
 	printf "Snapper Descriptions\n"
 	printf "  backup finished:  '%s'\n" "$snap_description_finished"
@@ -574,7 +583,7 @@ run_config () {
 	eval "backup_dir_$i=$backupdir"
 
         if [ "$verbose" ]; then
-	    if [ -n "$ssh" ];then
+	    if [ -n "$remote" ];then
 		printf "Backup-Path on remote %s: %s\n" "$remote" "$backup_root"
 	    else
 		printf "Backup-Path: %s\n" "$backup_root"
@@ -599,7 +608,7 @@ run_config () {
 	# the backup_location needs to be in a subvol ".snapshots" inside $selected_config (hardcoded in snapper)
 	snapper_target_config="snap-$selected_config"
 	snapper_target_snapshot=$backup_root/$snapper_target_config/.snapshots/$snapper_new_id
-	if [ -z "$ssh" ]; then
+	if [ -z "$remote" ]; then
 	    printf "Will backup %s to %s\n" "$snapper_new_snapshot" "$snapper_target_snapshot/snapshot" | tee $PIPE
 	else
 	    printf "Will backup %s to %s\n" "$snapper_new_snapshot" "$remote":"$snapper_target_snapshot/snapshot" | tee $PIPE
@@ -739,7 +748,7 @@ run_backup () {
 		else
 		    printf "dryrun: btrfs send %s -c %s  %s | %s btrfs receive %s %s\n" \
 			   "$verbose_flag" "$snapper_sync_snapshot" "$snapper_new_snapshot" \
-			   "$ssh" "$verbose_flag" "$snapper_target_snapshot"
+			   "$remote" "$verbose_flag" "$snapper_target_snapshot"
 		    printf "dryrun: snapper --config %s delete %s\n" "$selected_config" "$snapper_sync_id"
 		fi
 	    else
@@ -759,14 +768,14 @@ run_backup () {
 		else
 		    printf "dryrun: btrfs send %s -c %s  %s | %s btrfs receive %s %s\n" \
 			   "$verbose_flag" "$snapper_sync_snapshot" "$snapper_new_snapshot" \
-			   "$ssh" "$verbose_flag" "$snapper_target_snapshot"
+			   "$remote" "$verbose_flag" "$snapper_target_snapshot"
 		    printf "dryrun: snapper --config %s delete %s\n" "$selected_config" "$snapper_sync_id"
 		fi
 	    fi
 	fi
 
 	# finally: send the snapper info metadata
-	if [ -z "$ssh" ]; then
+	if [ -z "$remote" ]; then
 	    if [ ! "$dryrun" ]; then
 		cp "$snapper_new_info" "$snapper_target_snapshot"
 	    else
@@ -775,9 +784,17 @@ run_backup () {
 	    fi
 	else
 	    if [ ! "$dryrun" ]; then
-		rsync -avzq "$snapper_new_info" "$remote":"$snapper_target_snapshot"
+		if [ -n "$port" ]; then
+		    rsync -avzq -e "ssh -p $port" "$snapper_new_info" "$remote:$snapper_target_snapshot"
+		else
+		    rsync -avzq "$snapper_new_info" "$remote":"$snapper_target_snapshot"
+		fi
 	    else
-		cmd="rsync -avzq $snapper_new_info $remote:$snapper_target_snapshot"
+		if [ -n "$port" ]; then
+		    cmd="rsync -avzq -e \"ssh -p $port\" $snapper_new_info $remote:$snapper_target_snapshot
+		else
+		    cmd="rsync -avzq $snapper_new_info $remote:$snapper_target_snapshot"
+		fi
 		printf "dryrun: %s\n" "$cmd"
 	    fi
 	fi
@@ -862,7 +879,7 @@ run_finalize () {
 		if [ -n "$ret" ]; then
 		    if [ "$ret" -eq "$snapper_new_id" ]; then
 			cmd="snapper --verbose --config \"$snapper_target_config\" modify --description \"$snap_description_finished\" --userdata \"$target_userdata\" \"$snapper_new_id\""
-			if [ -n "$ssh" ]; then
+			if [ -n "$remote" ]; then
 			    ret=$($ssh "$cmd")
 			else
 			    ret=$(eval $cmd)
@@ -907,7 +924,7 @@ select_target_disk () {
     local subvol=''
 
     # print selection table
-    if [ -z "$ssh" ]; then
+    if [ -z "$remote" ]; then
         printf "Selecting a mounted BTRFS device for backups on your local machine.\n"
     else
         printf "Selecting a mounted BTRFS device for backups on %s.\n" "$remote"
@@ -998,7 +1015,7 @@ set_config(){
     local config_key=${2:-SUBVOLUME}
     local config_value=${3:-/var/lib/snap-sync}
 
-    if [ -n "$ssh" ]; then
+    if [ -n "$remote" ]; then
 	$ssh sed -i \'"s#^\($config_key\s*=\s*\).*\$#\1\"$config_value\"#"\' $config
     else
 	sed -i "s#^\($config_key\s*=\s*\).*\$#\1\"$config_value\"#" $config
@@ -1037,6 +1054,10 @@ Options:
                              (e.g. -c "root home").
  -n, --noconfirm             Do not ask for confirmation for each configuration. Will still prompt for backup
      --batch                 directory name on first backup"
+ -r, --remote <address>      Send the snapshot backup to a remote machine. The snapshot will be sent via ssh.
+                             You should specify the remote machine's hostname or ip address. The 'root' user
+                             must be permitted to login on the remote machine.
+ -p, --port <port>           The remote port.
  -s, --subvolid <subvlid>    Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
  -u, --uuid <UUID>           Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt."
                              If multiple mount points are found with the same UUID, will prompt user."
@@ -1184,19 +1205,19 @@ parse_params $@
 get_disk_infos
 
 if [ "$target_cmdline" != "none" ]; then
-    if [ -z "$ssh" ]; then
+    if [ -z "$remote" ]; then
         notify_info "Backup started" "Starting backups to '$target_cmdline' ..."
     else
         notify_info "Backup started" "Starting backups to '$target_cmdline'  at $remote ..."
     fi
 elif [ "$uuid_cmdline" != "none" ]; then
-    if [ -z "$ssh" ]; then
+    if [ -z "$remote" ]; then
         notify_info "Backup started" "Starting backups to $uuid_cmdline..."
     else
         notify_info "Backup started" "Starting backups to $uuid_cmdline at $remote..."
     fi
 else
-    if [ -z "$ssh" ]; then
+    if [ -z "$remote" ]; then
         notify_info "Backup started" "Starting backups. Use command line menu to select disk."
     else
         notify_info "Backup started" "Starting backups. Use command line menu to select disk on $remote."
@@ -1207,7 +1228,7 @@ fi
 select_target_disk
 
 printf "\nYou selected the disk with UUID %s (subvolid=%s).\n" "$selected_uuid" "$selected_subvol" | tee $PIPE
-if [ -z "$ssh" ]; then
+if [ -z "$remote" ]; then
     printf "The disk is mounted at %s.\n" "$selected_target" | tee $PIPE
 else
     printf "The disk is mounted at %s:%s.\n" "$remote" "$selected_target" | tee $PIPE
