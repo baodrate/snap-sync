@@ -510,7 +510,7 @@ run_config () {
 		       "$selected_uuid" "$selected_subvol" "$selected_config"
 		printf "Please cleanup for further processing.\n" | tee PIPE
 		error "Skipping configuration $selected_config."
-		selected_configs=$(echo $selected_configs | sed -e "s/\($selected_config*\)//")
+		selected_configs=$(echo $selected_configs | sed -e "s/\($selected_config\)//")
 		continue
 	    fi
 	fi
