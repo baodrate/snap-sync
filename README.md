@@ -173,3 +173,7 @@ to be sent.
 
 Help wanted! Feel free to fork and issue a pull request to add features or
 tackle an open issue.
+
+## Related projects
+
+See @rzerres's [fork](https://github.com/rzerres/snap-sync) which has several enhancments.
