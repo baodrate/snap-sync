@@ -5,7 +5,7 @@ etcdirs="sysconfig default conf.d"
 for x in $etcdirs; do
     d=/etc/$x/snapper
     if [[ -f $d ]]; then
-	    sed -i 's@^SNAPPER_CONFIG.*@SNAPPER_CONFIG='$d'@g' bin/snap-sync
+	    sed -i 's@^SNAPPER_CONFIG=.*@SNAPPER_CONFIG='$d'@g' bin/snap-sync
         exit 0
     fi
 done
