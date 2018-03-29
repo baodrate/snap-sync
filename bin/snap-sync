@@ -886,12 +886,12 @@ run_finalize () {
 	    if [ "$verbose" ]; then
 		printf "Tagging snapper metadata on target for configuration '%s' ...\n" "$selected_config"
 	    fi
-	    i=1
-	    i_max=20
+	    ii=1
+	    ii_max=20
 	    cmd="snapper --verbose --config \"$snapper_target_config\" list --type single | awk '/'\"$snap_description_running\"'/' | awk -F '|' '\$1 == "$snapper_new_id" {print \$1}'"
 	    # !!! ugly hack !!!: wait for snapper to list target snapshot in database. how to trigger database resync?
 	    # it is not deterministic, when the entry in the listing will show up .... for now, wait max 10 min ...
-	    while [ "$i" -le  "$i_max" ]; do
+	    while [ "$ii" -le  "$ii_max" ]; do
 		if [ -n "$remote" ]; then
 		    ret=$($ssh $cmd)
 		else
@@ -911,10 +911,10 @@ run_finalize () {
 		    fi
 		fi
 		if [ "$verbose" ]; then
-		    printf "Waiting for snappers database update on target %s/%s ...\n" "$i" "$max"
+		    printf "Waiting for snappers database update on target %s/%s ...\n" "$ii" "$ii_max"
 		fi
 		sleep 30
-		i=$(($i + 1))
+		ii=$(($ii + 1))
 	    done
 	else
 	    cmd="snapper --verbose --config $selected_config modify --description $snap_description_synced --userdata $userdata $snapper_new_id"
