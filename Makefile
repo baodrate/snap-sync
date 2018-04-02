@@ -26,6 +26,6 @@ SYSTEMD_DIR = $(DESTDIR)$(PREFIX)/lib/systemd/system
 .PHONY: install
 
 install:
-	@./find_snapper_config || sed -i 's@^SNAPPER_CONFIG.*@SNAPPER_CONFIG='$(SNAPPER_CONFIG)'@g' bin/$(PKGNAME)
+	@./find_snapper_config || sed -i 's@^SNAPPER_CONFIG=.*@SNAPPER_CONFIG='$(SNAPPER_CONFIG)'@g' bin/$(PKGNAME)
 	@install -Dm755 bin/* -t $(BIN_DIR)/
-	@install -Dm644 ./$(SNAPPER_TEMPLATES)/* -t $(SNAPPER_TEMPLATES)/
+	@install -Dm644 ./$(SNAPPER_TEMPLATES)/* -t $(DESTDIR)/$(SNAPPER_TEMPLATES)/
