@@ -355,6 +355,11 @@ for x in $selected_configs; do
         printf "Will backup %s to %s\n" "$new_snap" "$remote":"$backup_location/snapshot" | tee $PIPE
     fi
 
+    if ($ssh test -d "$backup_location/snapshot") ; then
+        printf "WARNING: Backup directory '%s' already exists. This configuration will be skipped!\n" "$backup_location/snapshot" | tee $PIPE
+        printf "Move or delete destination directory and try backup again.\n" | tee $PIPE
+    fi
+
     NEW_NUM_ARRAY[$i]="$new_num"
     NEW_SNAP_ARRAY[$i]="$new_snap"
     NEW_INFO_ARRAY[$i]="$new_info"
@@ -423,7 +428,6 @@ for x in $selected_configs; do
 
     if ($ssh test -d "$backup_location/snapshot") ; then
         printf "ERROR: Backup directory '%s' already exists. Skipping backup of this configuration!\n" "$backup_location/snapshot" | tee $PIPE
-        printf "Move or delete destination directory and try backup again.\n" | tee $PIPE
         continue
     fi
 
