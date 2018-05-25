@@ -421,6 +421,12 @@ for x in $selected_configs; do
     new_info="${NEW_INFO_ARRAY[$i]}"
     backup_location="${BACKUPLOC_ARRAY[$i]}"
 
+    if ($ssh test -d "$backup_location/snapshot") ; then
+        printf "ERROR: Backup directory '%s' already exists. Skipping backup of this configuration!\n" "$backup_location/snapshot" | tee $PIPE
+        printf "Move or delete destination directory and try backup again.\n" | tee $PIPE
+        continue
+    fi
+
     $ssh mkdir -p $backup_location
 
     if [[ -z "$old_num" ]]; then
@@ -434,6 +440,7 @@ for x in $selected_configs; do
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
+
         btrfs send -c "$old_snap" "$new_snap" | $ssh btrfs receive "$backup_location"
         printf "Modifying data for old snapshot for %s...\n" "$x" | tee $PIPE
         snapper -v -c "$x" modify -d "old snap-sync snapshot (you may remove)" -u "backupdir=,subvolid=,uuid=" -c "number" "$old_num"
