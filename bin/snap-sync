@@ -244,7 +244,7 @@ if [[ "$disk" == -1 ]]; then
             printf "%4s) %s (uuid=%s, subvolid=%s)\n" "$((x+1))" "${TARGETS_ARRAY[$x]}" "${UUIDS_ARRAY[$x]}" "${SUBVOLIDS_ARRAY[$x]}"
         done
         printf "%4s) Exit\n" "0"
-        read -r -p "Enter a number: " disk
+        read -e -r -p "Enter a number: " disk
         if ! [[ $disk == ?(-)+([0-9]) ]]; then
             printf "\nNo disk selected. Select a disk to continue.\n"
             disk=-1
@@ -293,11 +293,11 @@ for x in $selected_configs; do
 
     if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
         printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x" | tee $PIPE
-        read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
+        read -e -r -p "Delete failed backup snapshots [y/N]? " delete_failed
         while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
             "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
             "$delete_failed" != [Nn] ]]; do
-            read -r -p "Delete failed backup snapshots [y/N]? " delete_failed
+            read -e -r -p "Delete failed backup snapshots [y/N]? " delete_failed
             if [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
             "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
             "$delete_failed" != [Nn] ]]; then
@@ -331,7 +331,7 @@ for x in $selected_configs; do
 
     if [[ -z "$old_num" ]]; then
         printf "No backups have been performed for '%s' on this disk.\n" "$x"
-        read -r -p "Enter name of subvolume to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
+        read -e -r -p "Enter name of subvolume to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
         printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
         BACKUPDIR="$selected_mnt/$mybackupdir"
         $ssh test -d "$BACKUPDIR" || $ssh btrfs subvolume create "$BACKUPDIR"
@@ -368,7 +368,7 @@ for x in $selected_configs; do
         while [[ -n "$cont_backup" && "$cont_backup" != [Yy]"es" &&
             "$cont_backup" != [Yy] && "$cont_backup" != [Nn]"o" &&
             "$cont_backup" != [Nn] ]]; do
-            read -r -p "Continue with backup [Y/n]? " cont_backup
+            read -e -r -p "Continue with backup [Y/n]? " cont_backup
             if [[ -n "$cont_backup" && "$cont_backup" != [Yy]"es" &&
             "$cont_backup" != [Yy] && "$cont_backup" != [Nn]"o" &&
             "$cont_backup" != [Nn] ]]; then
