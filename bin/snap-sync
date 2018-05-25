@@ -293,19 +293,23 @@ for x in $selected_configs; do
 
     if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
         printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x" | tee $PIPE
-        read -e -r -p "Delete failed backup snapshots [y/N]? " delete_failed
-        while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
-            "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
-            "$delete_failed" != [Nn] ]]; do
+        if [[ $noconfirm == "yes" ]]; then
+            printf "'noconfirm' option passed. Failed backups will not be deleted.\n" | tee $PIPE
+        else
             read -e -r -p "Delete failed backup snapshots [y/N]? " delete_failed
-            if [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
-            "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
-            "$delete_failed" != [Nn] ]]; then
-                printf "Select 'y' or 'N'.\n"
+            while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
+                "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
+                "$delete_failed" != [Nn] ]]; do
+                read -e -r -p "Delete failed backup snapshots [y/N]? " delete_failed
+                if [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
+                "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
+                "$delete_failed" != [Nn] ]]; then
+                    printf "Select 'y' or 'N'.\n"
+                fi
+            done
+            if [[ "$delete_failed" == [Yy]"es" || "$delete_failed" == [Yy] ]]; then
+                snapper -c $x delete $(snapper -c $x list | awk '/'$name' backup in progress/ {print $3}')
             fi
-        done
-        if [[ "$delete_failed" == [Yy]"es" || "$delete_failed" == [Yy] ]]; then
-            snapper -c $x delete $(snapper -c $x list | awk '/'$name' backup in progress/ {print $3}')
         fi
     fi
 
