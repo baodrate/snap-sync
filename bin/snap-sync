@@ -29,6 +29,11 @@ set -o errtrace
 version="0.5.1"
 name="snap-sync"
 
+printf "\nsnap-sync version %s, Copyright (C) 2016-2018 Wes Barnett\n" "$version"
+printf "snap-sync comes with ABSOLUTELY NO WARRANTY. This is free software,
+and you are welcome to redistribute it under certain conditions. See 
+the license for more information. \n\n"
+
 # The following line is modified by the Makefile or
 # find_snapper_config script
 SNAPPER_CONFIG=/etc/conf.d/snapper
@@ -279,8 +284,6 @@ declare -a NEW_SNAP_ARRAY
 declare -a NEW_INFO_ARRAY
 declare -a BACKUPLOC_ARRAY
 declare -a CONT_BACKUP_ARRAY
-
-printf "\nInitial configuration...\n" | tee $PIPE
 
 # Initial configuration of where backup directories are
 i=0
