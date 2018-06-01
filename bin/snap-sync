@@ -30,9 +30,8 @@ version="0.5.1"
 name="snap-sync"
 
 printf "\nsnap-sync version %s, Copyright (C) 2016-2018 Wes Barnett\n" "$version"
-printf "snap-sync comes with ABSOLUTELY NO WARRANTY. This is free software,
-and you are welcome to redistribute it under certain conditions. See 
-the license for more information. \n\n"
+printf "snap-sync comes with ABSOLUTELY NO WARRANTY. This is free software, and you are welcome to redistribute it 
+under certain conditions. See the license for more information. \n\n"
 
 # The following line is modified by the Makefile or
 # find_snapper_config script
@@ -106,19 +105,20 @@ $name $version
 Usage: $name [options]
 
 Options:
- -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
  -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper
                           configuration. Can list multiple configurations within quotes, space-separated
                           (e.g. -c "root home").
+ -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
+ -h, --help               Print this help message.
  -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
+ -p, --port <port>        The remote port. Used with '--remote'.
                           directory name on first backup.
- -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
-                          If multiple mount points are found with the same UUID, will prompt user.
- -s, --subvolid <subvlid> Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
  -r, --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
                           should specify the remote machine's hostname or ip address. The 'root' user must be
                           permitted to login on the remote machine.
- -p, --port <port>        The remote port.
+ -s, --subvolid <subvlid> Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
+ -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
+                          If multiple mount points are found with the same UUID and subvolid, will prompt user.
 EOF
 }
 
@@ -160,7 +160,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
 	    ;;
         *)
-            die "Unknown option: $key\nRun '$name -h' for valid options.\n"
+            die "Unknown option: '$key'. Run '$name -h' for valid options."
         ;;
     esac
 done
@@ -240,9 +240,9 @@ if [[ "$disk" == -1 ]]; then
         error "A device with UUID $uuid_cmdline and subvolid $subvolid_cmdline was not found to be mounted, or it is not a BTRFS device."
     fi
     if [[ -z $ssh ]]; then
-        printf "Select a mounted BTRFS device on your local machine to backup to.\nFor more options, exit and use '-h' flag.\n"
+        printf "Select a mounted BTRFS device on your local machine to backup to.\nFor more options, exit and run '$name -h'.\n"
     else
-        printf "Select a mounted BTRFS device on %s to backup to.\nFor more options, exit and use '-h' flag.\n" "$remote"
+        printf "Select a mounted BTRFS device on %s to backup to.\nFor more options, exit and run '$name -h'.\n" "$remote"
     fi
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
         for x in "${!TARGETS_ARRAY[@]}"; do
