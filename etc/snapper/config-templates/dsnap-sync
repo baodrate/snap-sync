@@ -1,9 +1,9 @@
 ###
-# snapper template for snap-sync handling
+# snapper template for dsnap-sync handling
 ###
 
 # subvolume to snapshot
-SUBVOLUME="/var/lib/snap-sync"
+SUBVOLUME="/var/lib/dsnap-sync"
 
 # filesystem type
 FSTYPE="btrfs"

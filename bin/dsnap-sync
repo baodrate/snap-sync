@@ -1,7 +1,7 @@
 #! /bin/sh
 
-# snap-sync
-# https://github.com/wesbarnett/snap-sync
+# dsnap-sync
+# https://github.com/rzerres/dsnap-sync
 # Copyright (C) 2016, 2017 James W. Barnett
 # Copyright (C) 2017, 2018 Ralf Zerres
 
@@ -32,7 +32,7 @@ version="0.5.2.2"
 # The following lines are modified by the Makefile or
 # find_snapper_config script
 #SNAPPER_CONFIG=/etc/conf.d/snapper
-SNAPPER_CONFIG=/etc/default/snapper
+SNAPPER_CONFIG=/etc/conf.d/snapper
 SNAPPER_TEMPLATE_DIR=/etc/snapper/config-templates
 SNAPPER_CONFIG_DIR=/etc/snapper/configs
 
@@ -61,7 +61,7 @@ selected_uuid='none'
 selected_target='none'
 selected_subvol='none'
 snapper_snapshots=".snapshots"  # hardcoded in snapper
-snapper_snapsync_template="snap-sync"
+snapper_snapsync_template="dsnap-sync"
 
 ###
 # functions
@@ -443,9 +443,9 @@ parse_params () {
     . $SNAPPER_CONFIG
     selected_configs=${selected_configs:-$SNAPPER_CONFIGS}
 
-    snap_description_finished=${snap_description_finished:-"snap-sync backup"}
-    snap_description_running=${snap_description_running:-"snap-sync in progress"}
-    snap_description_synced=${snap_description_synced:-"snap-sync last incremental"}
+    snap_description_finished=${snap_description_finished:-"dsnap-sync backup"}
+    snap_description_running=${snap_description_running:-"dsnap-sync in progress"}
+    snap_description_synced=${snap_description_synced:-"dsnap-sync last incremental"}
 
     uuid_cmdline=${uuid_cmdline:-"none"}
     target_cmdline=${target_cmdline:-"none"}
@@ -500,7 +500,7 @@ run_config () {
     # Pseudo Arrays $i -> store associated elements of selected_config
     i=0
     for selected_config in $selected_configs; do
-	# only process existing snap-sync configurations
+	# only process existing dsnap-sync configurations
 	if [ ! -f "/etc/snapper/configs/$selected_config" ]; then
 	    die "Selected snapper configuration '$selected_config' does not exist."
 	else
@@ -1035,7 +1035,7 @@ select_target_disk () {
 set_config(){
     local config=${1:-/etc/snapper/config-templates/"$snapper_snapsync_template"}
     local config_key=${2:-SUBVOLUME}
-    local config_value=${3:-/var/lib/snap-sync}
+    local config_value=${3:-/var/lib/dsnap-sync}
 
     if [ -n "$remote" ]; then
 	$ssh sed -i \'"s#^\($config_key\s*=\s*\).*\$#\1\"$config_value\"#"\' $config
@@ -1067,10 +1067,10 @@ Usage: $progname [options]
 Options:
  -b, --backupdir <prefix>    backupdir is a relative path that will be appended to target backup-root
  -d, --description <desc>    Change the snapper description. Default: "latest incremental backup"
-     --label-finished <desc> snapper description tagging successful jobs. Default: "snap-sync backup"
-     --label-running <desc>  snapper description tagging active jobs. Default: "snap-sync in progress"
+     --label-finished <desc> snapper description tagging successful jobs. Default: "dsnap-sync backup"
+     --label-running <desc>  snapper description tagging active jobs. Default: "dsnap-sync in progress"
      --label-synced <desc>   snapper description tagging last synced jobs.
-                             Default: "snap-sync last incremental"
+                             Default: "dsnap-sync last incremental"
  -c, --config <config>       Specify the snapper configuration to use. Otherwise will perform for each snapper
                              configuration. Can list multiple configurations within quotes, space-separated
                              (e.g. -c "root home").
@@ -1124,10 +1124,10 @@ verify_snapper_structure () {
 	   printf "Create new snapper capable BTRFS subvolume '%s:%s' ...\n"  "$remote_host" "$backup_root/$snapper_config"
 	fi
 	if [ ! "$dryrun" ]; then
-	    # verify that we can use a snap-sync aware template
+	    # verify that we can use a dsnap-sync aware template
 	    if $ssh [ ! -f $SNAPPER_TEMPLATE_DIR/$snapper_snapsync_template ]; then
 	        printf "A snapper template %s to configure the snapper subvolume %s is missing in %s on %s.\n" "$snapper_snapsync_template" "$snapper_config" "$SNAPPER_TEMPLATE_DIR" "$remote_host"
-	        printf "Did you miss to install the snap-sync's default snapper template on %s?\n" "$remote"
+	        printf "Did you miss to install the dsnap-sync's default snapper template on %s?\n" "$remote"
 	        die "snapper template %s to configure the snapper subvolume %s is missing in %s on %s.\n" "$snapper_snapsync_template" "$snapper_config" "$SNAPPER_TEMPLATE_DIR" "$remote_host"
 	    fi
             # create the non existing remote BTRFS subvolume

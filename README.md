@@ -1,11 +1,11 @@
-<!-- snap-sync README.md -->
-<!-- version: 0.5.1 -->
+<!-- dsnap-sync README.md -->
+<!-- version: 0.5.2 -->
 
-# snap-sync
+# dsnap-sync
 
 ## About
 
-`snap-sync` is implemented as a posix shell script.
+`dsnap-sync` is implemented as a posix shell script (dash).
 It takes advantage of the specific functionality of a btrfs file system and
 makes it possible to backup data while sending incremental snapshots to another
 drive. It's fine to store to dives on a remote host (using ssh).
@@ -13,22 +13,24 @@ drive. It's fine to store to dives on a remote host (using ssh).
 Plug in and mount any btrfs-formatted device you want your system to be
 backed up to (eg. local USB drive, remote RAID drives).
 
-`snap-sync` will support interactive an time scheduled backup runs.
+`dsnap-sync` will support interactive an time scheduled backup runs.
 
 * An interactive run will request you to select a mounted btrfs device.
-You can pre-select the target drive via [command line options](https://github.com/wesbarnett/snap-sync#options).
+You can pre-select the target drive via [command line options](https://github.com/wesbarnett/dsnap-sync#options).
 Either use the UUID, the SUBVOLID or it's TARGET (read 'mount point').
 
 * A scheduled run will take all needed parameters from config options.
 
-For a backup run, `snap-sync` will iterate through all defined snapper configurations
+For a backup run, `dsnap-sync` will iterate through all defined snapper configurations
 found on your source system. If you prefer to just run on a specific configuration,
 you can select this using the 'config' option `-c`. For each selected configuration
 it will use snapper to create an appropriate local snapshot.
 
+We do also support systemd.timer units. Please refer to related paragraph below.  
+
 ## Requirements
 
-`snap-sync`relies on external tools to achieve its goal.
+`dsnap-sync`relies on external tools to achieve its goal.
 At run-time their availability is checked. Following tools are are used:
 
 - snapper
@@ -47,14 +49,14 @@ configuration file, specify it on the command line with
     # make SNAPPER_CONFIG=/etc/conf.d/snapper install
 
 The local snapper configuration will be extended to make use
-of a new template 'snap-sync'.
+of a new template 'dsnap-sync'.
 
 The package is also available in the
-[AUR](https://aur.archlinux.org/packages/snap-sync/).
+[AUR](https://aur.archlinux.org/packages/dsnap-sync/).
 
 ## Options
 
-    Usage: snap-sync [options]
+    Usage: dsnap-sync [options]
 
     Options:
      -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
@@ -77,7 +79,7 @@ The package is also available in the
 
 ## First run
 
-If you have never synced to the paticular target device (first run), `snap-sync`
+If you have never synced to the paticular target device (first run), `dsnap-sync`
 will take care to create the necessary target file-structure to store the snapshot.
 As an option you can prepend a backup-path.
 
@@ -86,33 +88,33 @@ You have to confirm any further operation, or use defaults (option: noconfirm).
 
 ## Example command line usage
 
-### Snap-sync to local target
+### dsnap-sync to local target
 
 #### Default: no selections, run for all snapper configs
 
-    # snap-sync
+    # dsnap-sync
 
 #### Default: Select two configs, the backupdir and verbose output
 
-    # snap-sync --verbose --config root --config data2 --backupdir=toshiba_r700
+    # dsnap-sync --verbose --config root --config data2 --backupdir=toshiba_r700
 
 #### Dry-run: Select config, select Target, as batchjob (--noconfirm)
 
-    # snap-sync  -c root -s 265 --noconfirm --dry-run
+    # dsnap-sync  -c root -s 265 --noconfirm --dry-run
 
 
-### Snap-sync to remote host
+### dsnap-sync to remote host
 
-`snap-sync` will rely on ssh access to the target host. For batch usage make sure, that your
+`dsnap-sync` will rely on ssh access to the target host. For batch usage make sure, that your
 public key is accepted for remote login as user 'root'. You may have to adapt /root/.ssh/authorized_keys
 on the target host.
 
-On your target host, you should also verify the availability of a snap-sync config-template for snapper.
-A template `snap-sync` is included in the package for your convenience.
+On your target host, you should also verify the availability of a dsnap-sync config-template for snapper.
+A template `dsnap-sync` is included in the package for your convenience.
 
 #### Dryrun: Select remote host <ip/fqdn>, interactive, run for all configs
 
-    snap-sync --dry-run --remote 172.16.0.3
+    dsnap-sync --dry-run --remote 172.16.0.3
 	Selecting a mounted BTRFS device for backups on 172.16.0.3.
 	  0) / (uuid=5af3413e-59ea-4862-8cff-304afe25420f,subvolid=257,subvol=/root)
 	  1) /.snapshots (uuid=5af3413e-59ea-4862-8cff-304afe25420f,subvolid=258,subvol=/@snapshots-root)
@@ -125,7 +127,7 @@ A template `snap-sync` is included in the package for your convenience.
 	  8) /data (uuid=2ba04452-74aa-44df-b1c7-74e0a70c6543,subvolid=257,subvol=/data)
 	  9) /var/lib/machines/.snapshots (uuid=2ba04452-74aa-44df-b1c7-74e0a70c6543,subvolid=2121,subvol=/@snapshots-machines)
 	 10) /data/.snapshots (uuid=2ba04452-74aa-44df-b1c7-74e0a70c6543,subvolid=258,subvol=/@snapshots-data)
-	 11) /var/lib/snap-sync (uuid=753eba7a-41ce-49e0-b2e3-24ee07811efd,subvolid=420,subvol=/snap-sync)
+	 11) /var/lib/dsnap-sync (uuid=753eba7a-41ce-49e0-b2e3-24ee07811efd,subvolid=420,subvol=/dsnap-sync)
 	  x) Exit
     Enter a number: 11
 
@@ -134,26 +136,26 @@ A template `snap-sync` is included in the package for your convenience.
 
 #### Sync: Select config 'data2', remote host <ip/fqdn>, target '/data', as batchjob (--noconfirm)
 
-    # snap-sync --config data2 --remote 172.16.0.3 --target /data --noconfirm
+    # dsnap-sync --config data2 --remote 172.16.0.3 --target /data --noconfirm
 
 ## systemd example
 
 ### service
 
     [Unit]
-    Description=Run snap-sync backup
+    Description=Run dsnap-sync backup
 
     [Install]
     WantedBy=multi-user.target
 
     [Service]
     Type=simple
-    ExecStart=/usr/bin/snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
+    ExecStart=/usr/bin/dsnap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
 
 ### timer
 
     [Unit]
-    Description=Run snap-sync weekly
+    Description=Run dsnap-sync weekly
 
     [Timer]
     OnCalendar=weekly
@@ -166,11 +168,11 @@ A template `snap-sync` is included in the package for your convenience.
 ## snapper template
 
 	###
-	# template for snap-sync handling
+	# template for dsnap-sync handling
 	###
 
 	# subvolume to snapshot
-	SUBVOLUME="/var/lib/snap-sync"
+	SUBVOLUME="/var/lib/dsnap-sync"
 
 	# filesystem type
 	FSTYPE="btrfs"
@@ -201,13 +203,24 @@ A template `snap-sync` is included in the package for your convenience.
 	# use systemd.timer for cleanup
 	TIMELINE_CLEANUP="no"
 
-    # snap-sync as timer unit
+    # dsnap-sync as timer unit
     SNAP_SYNC_EXCLUDE="yes"
 
 ## Contributing
 
-Help wanted! Feel free to fork and issue a pull request to add features or
-tackle an open issue.
+Help is very welcome! Feel free to fork and issue a pull request to add features or
+tackle open issues.
+
+## Related projects
+
+I did fork from Wes Barnetts original work and wanted that to be merged back. 
+Beside the fact that this version doesn't use any bashisms, Wes did let me know,
+that he doesn't have the time to review the changes appropriately to make it a merge.
+Anyone willing to do so is invided.
+
+Until that date, i will offer this fork for the public. To overcome any name clashes
+i renamed this work to dsnap-sync.
+
 
 ## License
 
@@ -219,4 +232,5 @@ This work is licensed under a [Creative Common License 4.0][License-CC_BY]
 
 ![Creative Common Logo][Logo-CC_BY]
 
-© 2016, 2017 James W. Barnett, Ralf Zerres
+© 2016, 2017  James W. Barnett
+© 2017 - 2018 Ralf Zerres
