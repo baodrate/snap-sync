@@ -165,7 +165,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ $EUID -ne 0 ]] && die "Script must be run as root." 
+[[ $EUID -ne 0 ]] && die "Script must be run as root. See '$name -h' for a description of options" 
 ! [[ -f $SNAPPER_CONFIG ]] && die "$SNAPPER_CONFIG does not exist."
 
 description=${description:-"latest incremental backup"}
@@ -227,7 +227,7 @@ for x in $UUIDS; do
 done
 
 if [[ "${#UUIDS_ARRAY[$@]}" -eq 0 ]]; then
-    die "No external btrfs subvolumes found to backup to."
+    die "No external btrfs subvolumes found to backup to. Run '$name -h' for more options."
 fi
 
 if [[ "$disk_count" > 1 ]]; then
