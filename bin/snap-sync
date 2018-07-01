@@ -264,7 +264,7 @@ fi
 selected_subvolid="${SUBVOLIDS_ARRAY[$((disk))]}"
 selected_uuid="${UUIDS_ARRAY[$((disk))]}"
 selected_mnt="${TARGETS_ARRAY[$((disk))]}"
-printf "\nYou selected the disk with uuid=%s, subovolid=%s.\n" "$selected_uuid" "$selected_subvolid" | tee $PIPE
+printf "\nYou selected the disk with uuid=%s, subvolid=%s.\n" "$selected_uuid" "$selected_subvolid" | tee $PIPE
 if [[ -z $ssh ]]; then
     printf "The disk is mounted at '%s'.\n" "$selected_mnt" | tee $PIPE
 else
