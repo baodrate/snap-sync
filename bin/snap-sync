@@ -314,7 +314,7 @@ for x in $selected_configs; do
                 fi
             done
             if [[ "$delete_failed" == [Yy]"es" || "$delete_failed" == [Yy] ]]; then
-                snapper -c $x delete $(snapper -c $x list | awk '/'$name' backup in progress/ {print $3}')
+                snapper -c $x delete $(snapper -c $x list | awk '/'$name' backup in progress/ {print $1}')
             fi
         fi
     fi
