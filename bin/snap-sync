@@ -50,7 +50,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 notify() {
-    for u in $(users | sed 's/ /\n/' | sort -u); do
+    for u in $(users | tr ' ' '\n' | sort -u); do
         sudo -u $u DISPLAY=:0 \
         DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
         notify-send -a $name "$1" "$2" --icon="dialog-$3"
