@@ -29,12 +29,12 @@ configuration file, specify it on the command line with
 
 Starting with release 0.6, the tarballs are signed with my key with fingerprint
 `F7B28C61944FE30DABEEB0B01070BCC98C18BD66` ([public key]). Previous tarballs and commits
-with my PGP key. The key's fingerprint is `8535CEF3F3C38EE69555BF67E4B5E45AA3B8C5C3`.
+used a different key with fingerprint `8535CEF3F3C38EE69555BF67E4B5E45AA3B8C5C3`.
 
 
 ## Documentation
 
-See snap-sync(8) after installation.
+See `snap-sync(8)` after installation.
 
 ## Troubleshooting
 
