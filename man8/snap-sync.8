@@ -20,6 +20,12 @@ the device where the backup snapshots will go. Additionally you are shown the lo
 of the backed up snapshot. If you have performed a backup to this device before, only
 the changes since the last backup have to be sent.
 
+Use `snapper` to view the snapshots for a subvolume you have backed up. A snapshots with
+the description `Latest incremental backup` is kept on our local machine so that the
+next time `snap-sync` runs it will only transfer the difference between it and a new
+snapshot. Don't manually delete that snapshot unless you want to do an entirely new
+backup, transferring all of the data again.
+
 .SH OPTIONS
 
 \fB\-c, \-\-config\fR <config>    
@@ -90,6 +96,42 @@ Specify the UUID and subvolume of the external disk, backing up all subvolumes w
 snapper configuration without promptin for confirmation.
 .RE
 
+.SH FAQ
+.SS How do I run this program on a schedule automatically?
+You can create systemd unit and timer. Here is an example service:
+
+.EX
+
+    [Unit]
+    Description=Run snap-sync backup 
+
+    [Install]
+    WantedBy=multi-user.target
+
+    [Service]
+    Type=simple
+    ExecStart=/usr/bin/snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
+
+.EE
+
+And here is its corresponding timer:
+
+.EX
+
+    [Unit]
+    Description=Run snap-sync weekly
+
+    [Timer]
+    OnCalendar=weekly
+    AccuracySec=12h
+    Persistent=true
+
+    [Install]
+    WantedBy=timers.target
+
+.EE
+
+
 .SH HOMEPAGE
 https://github.com/wesbarnett/snap-sync
 
@@ -98,4 +140,4 @@ Wes Barnett <wes@wbarnett.us>
 
 .SH SEE ALSO
 .BR btrfs-send (8),
-.BR snapper (8),
+.BR snapper (8)
