@@ -21,6 +21,7 @@ SNAPPER_CONFIG ?= /etc/sysconfig/snapper
 
 BIN_DIR = $(DESTDIR)$(PREFIX)/bin
 SYSTEMD_DIR = $(DESTDIR)$(PREFIX)/lib/systemd/system
+SHARE_DIR = $(DESTDIR)$(PREFIX)/share
 
 .PHONY: install
 
