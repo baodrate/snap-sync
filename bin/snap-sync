@@ -105,20 +105,16 @@ $name $version
 Usage: $name [options]
 
 Options:
- -c, --config <config>    Specify the snapper configuration to use. Otherwise will perform for each snapper
-                          configuration. Can list multiple configurations within quotes, space-separated
-                          (e.g. -c "root home").
- -d, --description <desc> Change the snapper description. Default: "latest incremental backup"
- -h, --help               Print this help message.
- -n, --noconfirm          Do not ask for confirmation for each configuration. Will still prompt for backup
- -p, --port <port>        The remote port. Used with '--remote'.
-                          directory name on first backup.
- -r, --remote <address>   Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
-                          should specify the remote machine's hostname or ip address. The 'root' user must be
-                          permitted to login on the remote machine.
- -s, --subvolid <subvlid> Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
- -u, --UUID <UUID>        Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
-                          If multiple mount points are found with the same UUID and subvolid, will prompt user.
+ -c, --config <config>    snapper configuration to backup
+ -d, --description <desc> snapper description
+ -h, --help               print this message
+ -n, --noconfirm          do not ask for confirmation
+ -p, --port <port>        remote port; wsed with '--remote'.
+ -r, --remote <address>   ip address of a remote machine to backup to
+ -s, --subvolid <subvlid> subvolume id of the mounted BTRFS subvolume to back up to
+ -u, --UUID <UUID>        UUID of the mounted BTRFS subvolume to back up to
+
+See 'man snap-sync' for more details.
 EOF
 }
 
