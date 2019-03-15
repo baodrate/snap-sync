@@ -26,10 +26,10 @@
 
 set -o errtrace
 
-version="0.5.1"
+version="0.6"
 name="snap-sync"
 
-printf "\nsnap-sync version %s, Copyright (C) 2016-2018 Wes Barnett\n" "$version"
+printf "\nsnap-sync version %s, Copyright (C) 2016-2019 Wes Barnett\n" "$version"
 printf "snap-sync comes with ABSOLUTELY NO WARRANTY. This is free software, and you are welcome to redistribute it 
 under certain conditions. See the license for more information. \n\n"
 
