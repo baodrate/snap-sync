@@ -1,7 +1,5 @@
 # snap-sync
 
-## About
-
 This bash script sends incremental snapshots to another drive for backing up
 data. Plug in and mount any btrfs-formatted device you want your system to be
 backed up to (like a USB drive).  When you run the script you will be prompted
@@ -16,104 +14,43 @@ Additionally you are shown the location of the backed up snapshot. If you have
 performed a backup to this device before, only the changes since the last backup
 have to be sent.
 
-## Requirements
-
-snapper is required.
-
 ## Installation
 
-On Arch Linux install via pacman. Alternatively download the latest release and o:
+Install the `snap-sync` package using pacman if using Arch Linux.
 
-    # make install
+Alternatively, download the latest release and signature from the [releases page], verify the download, and then
+run `make install`. snapper is required.
 
 If your system uses a non-default location for the snapper
 configuration file, specify it on the command line with
-`SNAPPER_CONFIG`. For example, for Arch Linux use:
+`SNAPPER_CONFIG`. For example, for Arch Linux use
 
-    # make SNAPPER_CONFIG=/etc/conf.d/snapper install
+    make SNAPPER_CONFIG=/etc/conf.d/snapper install
 
-## Options
+Starting with release 0.6, the tarballs are signed with my key with fingerprint
+`F7B28C61944FE30DABEEB0B01070BCC98C18BD66` ([public key]). Previous tarballs and commits
+with my PGP key. The key's fingerprint is `8535CEF3F3C38EE69555BF67E4B5E45AA3B8C5C3`.
 
-Run `snap-sync -h` to see available options.
 
-## First run
+## Documentation
 
-When you run `snap-sync` you will be prompted to choose a disk to back up to.
-The first time you run `snap-sync` for a particular disk (new UUID) you will be
-prompted to choose a backup location on that disk. If the directory you specify
-does not exist, it will be created.
+See snap-sync(8) after installation.
 
-## Example command line usage
+## Troubleshooting
 
-### No arguments
-
-    # snap-sync
-
-### With UUID and subvolid specified and no confirmations
-
-    # snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
-
-## Viewing snap-sync snapshots
-
-Simply use `snapper` to view the snapshots for a subvolume you have backed up. A
-snapshots with the description `Latest incremental backup` is kept on our local machine
-so that the next time `snap-sync` runs it will only transfer the difference between it
-and a new snapshot. Don't manually delete that snapshot unless you want to do an
-entirely new backup, transferring all of the data again.
-
-## systemd example
-
-## service
-
-    [Unit]
-    Description=Run snap-sync backup 
-
-    [Install]
-    WantedBy=multi-user.target
-
-    [Service]
-    Type=simple
-    ExecStart=/usr/bin/snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
-
-## timer
-
-    [Unit]
-    Description=Run snap-sync weekly
-
-    [Timer]
-    OnCalendar=weekly
-    AccuracySec=12h
-    Persistent=true
-
-    [Install]
-    WantedBy=timers.target
+After reviewing the man page, check the [issues page] and file a new issue if your
+problem is not covered.
 
 ## Contributing
 
 Help wanted! Feel free to fork and issue a pull request to add features or
 tackle an open issue.
 
-## License
-
-    snap-sync
-    Copyright (C) 2016-2019, Wes Barnett
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-See `LICENSE` for more information.
-
 ## Related projects
 
-See @rzerres's [fork](https://github.com/rzerres/snap-sync) which has several enhancments.
+See [@rzerres's fork] which has several enhancments.
+
+[releases page]: https://github.com/wesbarnett/snap-sync/releases
+[public key]: https://barnett.science/public-key.asc
+[issues page]: https://github.com/wesbarnett/snap-sync/issues
+[@rzerres's fork]: https://github.com/rzerres/snap-sync
