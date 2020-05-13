@@ -459,9 +459,9 @@ for x in $selected_configs; do
         cp "$new_info" "$backup_location"
     else
         if [[ -z $port ]]; then
-            rsync -avzq "$new_info" "$remote":"$backup_location"
+            rsync -avzzq "$new_info" "$remote":"$backup_location"
         else
-            rsync -avzqe "ssh -p $port" "$new_info" "$remote":"$backup_location"
+            rsync -avzzqe "ssh -p $port" "$new_info" "$remote":"$backup_location"
         fi
     fi
 
