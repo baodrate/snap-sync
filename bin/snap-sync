@@ -112,6 +112,7 @@ Options:
  -r, --remote <address>   ip address of a remote machine to backup to
  -s, --subvolid <subvlid> subvolume id of the mounted BTRFS subvolume to back up to
  -u, --UUID <UUID>        UUID of the mounted BTRFS subvolume to back up to
+ -m, --mountpoint <path>   Mount point to be used in case the volume is mounted multiple times
 
 See 'man snap-sync' for more details.
 EOF
@@ -136,6 +137,10 @@ while [[ $# -gt 0 ]]; do
         ;;
         -s|--subvolid)
             subvolid_cmdline="$2"
+            shift 2
+        ;;
+        -m|--mountpoint)
+            mountpoint_cmdline="$2"
             shift 2
         ;;
         -n|--noconfirm)
@@ -166,6 +171,7 @@ done
 description=${description:-"latest incremental backup"}
 uuid_cmdline=${uuid_cmdline:-"none"}
 subvolid_cmdline=${subvolid_cmdline:-"5"}
+mountpoint_cmdline=${mountpoint_cmdline:-"none"}
 noconfirm=${noconfirm:-"no"}
 
 if [[ "$uuid_cmdline" != "none" ]]; then
@@ -191,11 +197,21 @@ fi
 
 if [[ "$($ssh findmnt -n -v --target / -o FSTYPE)" == "btrfs" ]]; then
     EXCLUDE_UUID=$($ssh findmnt -n -v -t btrfs --target / -o UUID)
-    TARGETS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $2}')
+    DETECTED_TARGETS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $2}')
     UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $1}')
 else
-    TARGETS=$($ssh findmnt -n -v -t btrfs -o TARGET --list)
+    DETECTED_TARGETS=$($ssh findmnt -n -v -t btrfs -o TARGET --list)
     UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID --list)
+fi
+
+if [[ "$mountpoint_cmdline" == "none" ]]; then
+    TARGETS=$DETECTED_TARGETS
+    else
+        if grep -q "$mountpoint_cmdline" <<< "$DETECTED_TARGETS" ;then
+            TARGETS=$mountpoint_cmdline
+        else
+            die "The provided mount point is not available"
+        fi
 fi
 
 declare -a TARGETS_ARRAY
