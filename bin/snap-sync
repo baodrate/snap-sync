@@ -204,7 +204,7 @@ declare -a SUBVOLIDS_ARRAY
 
 i=0
 for x in $TARGETS; do
-    SUBVOLIDS_ARRAY[$i]=$($ssh btrfs subvolume show $x | awk '/Subvolume ID:/ { print $3 }')
+    SUBVOLIDS_ARRAY[$i]=$($ssh sudo btrfs subvolume show $x | awk '/Subvolume ID:/ { print $3 }')
     TARGETS_ARRAY[$i]=$x
     i=$((i+1))
 done
@@ -339,7 +339,7 @@ for x in $selected_configs; do
         read -e -r -p "Enter name of subvolume to store backups, relative to $selected_mnt (to be created if not existing): " mybackupdir
         printf "This will be the initial backup for snapper configuration '%s' to this disk. This could take awhile.\n" "$x"
         BACKUPDIR="$selected_mnt/$mybackupdir"
-        $ssh test -d "$BACKUPDIR" || $ssh btrfs subvolume create "$BACKUPDIR"
+        $ssh test -d "$BACKUPDIR" || $ssh sudo btrfs subvolume create "$BACKUPDIR"
     else
         mybackupdir=$(snapper -c "$x" list -t single | awk -F"|" '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
@@ -440,7 +440,7 @@ for x in $selected_configs; do
 
     if [[ -z "$old_num" ]]; then
         printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
-        btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &>/dev/null
+        btrfs send "$new_snap" | $ssh sudo btrfs receive "$backup_location" &>/dev/null
 
     else
 
@@ -450,7 +450,7 @@ for x in $selected_configs; do
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
 
-        btrfs send -c "$old_snap" "$new_snap" | $ssh btrfs receive "$backup_location"
+        btrfs send -c "$old_snap" "$new_snap" | $ssh sudo btrfs receive "$backup_location"
         printf "Modifying data for old local snapshot for '%s' configuration...\n" "$x" | tee $PIPE
         snapper -v -c "$x" modify -d "old snap-sync snapshot (you may remove)" -u "backupdir=,subvolid=,uuid=" -c "number" "$old_num"
     fi
