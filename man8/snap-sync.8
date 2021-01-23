@@ -55,6 +55,14 @@ directory name on first backup.
 .RE
 .PP
 
+\fB\-k, \-\-keepold
+.RS 4
+By default, after a backup is performed for a snapper configuration, the previous
+local snapshot is deleted since a new local snapshot is created. It's not necessary
+to keep all of those snapshots, but if you pass this flag, it will be kept.
+.RE
+.PP
+
 \fB\-p, \-\-port\fR <port>
 .RS 4
 The remote port. Used with '--remote'.
