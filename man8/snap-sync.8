@@ -10,6 +10,7 @@ snap-sync \- send incremental btrfs snapshots, keeping track of them with snappe
 [\fB-n\fR] 
 [\fB-r\fR \fIaddress\fR] 
 [\fB-p\fR \fIport\fR] 
+[\fB--sudo\fR]
 [\fB-s\fR \fIsubvolid\fR] 
 [\fB-u\fR \fIUUID\fR]
 [\fB-q\fR]
@@ -81,6 +82,12 @@ notifications to stdout.
 Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
 should specify the remote machine's hostname or ip address. The 'root' user must be
 permitted to login on the remote machine.
+.RE
+.PP
+
+\fB\-\-sudo\fR
+.RS 4
+Use sudo on the remote machine. Only valid when used with the \fB\-\-remote\fR flag.
 .RE
 .PP
 

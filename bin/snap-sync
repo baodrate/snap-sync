@@ -87,6 +87,7 @@ Options:
  -p, --port <port>        remote port; wsed with '--remote'.
  -q, --quiet              do not send notifications; instead print them.
  -r, --remote <address>   ip address of a remote machine to backup to
+ --sudo                   use sudo on the remote machine
  -s, --subvolid <subvlid> subvolume id of the mounted BTRFS subvolume to back up to
  -u, --UUID <UUID>        UUID of the mounted BTRFS subvolume to back up to
 
@@ -95,6 +96,7 @@ EOF
 }
 
 ssh=""
+sudo=0
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
@@ -134,6 +136,10 @@ while [[ $# -gt 0 ]]; do
             port=$2
             shift 2
 	    ;;
+        --sudo)
+            sudo=1
+            shift
+        ;;
         *)
             die "Unknown option: '$key'. Run '$name -h' for valid options."
         ;;
@@ -190,6 +196,9 @@ if [[ -n $remote ]]; then
     ssh="ssh $remote"
     if [[ -n $port ]]; then
         ssh="$ssh -p $port"
+    fi
+    if [[ $sudo -eq 1 ]]; then
+        ssh="$ssh sudo"
     fi
 fi
 
