@@ -4,7 +4,17 @@
 snap-sync \- send incremental btrfs snapshots, keeping track of them with snapper
 
 .SH SYNOPSIS
-snap-sync [-c <config>] [-d <desc>] [-n] [-r <address>] [-s <subvolid>] [-u UUID]
+.B snap-sync
+[\fB-c\fR \fIconfig\fR] 
+[\fB-d\fR \fIdesc\fR] 
+[\fB-n\fR] 
+[\fB-r\fR \fIaddress\fR] 
+[\fB-p\fR \fIport\fR] 
+[\fB--sudo\fR]
+[\fB-s\fR \fIsubvolid\fR] 
+[\fB-u\fR \fIUUID\fR]
+[\fB-k\fR]
+[\fB-q\fR]
 
 .SH DESCRIPTION
 
@@ -28,7 +38,7 @@ backup, transferring all of the data again.
 
 .SH OPTIONS
 
-\fB\-c, \-\-config\fR <config>    
+\fB\-c, \-\-config\fR \fIconfig\fR    
 .RS 4
 Specify the snapper configuration to use. Otherwise will perform for each snapper
 configuration. Can list multiple configurations within quotes, space-separated (e.g. -c
@@ -36,7 +46,7 @@ configuration. Can list multiple configurations within quotes, space-separated (
 .RE
 .PP
 
-\fB\-d, \-\-description\fR <desc> 
+\fB\-d, \-\-description\fR \fIdesc\fR 
 .RS 4
 Change the snapper description. Default: "latest incremental backup"
 .RE
@@ -55,13 +65,29 @@ directory name on first backup.
 .RE
 .PP
 
-\fB\-p, \-\-port\fR <port>
+\fB\-k, \-\-keepold\fR
 .RS 4
-The remote port. Used with '--remote'.
+Keep the most recent local snapshot which is no longer needed.  By default, after a
+backup is performed for a snapper configuration, the previous local snapshot is deleted
+since a new local snapshot is created. It's not necessary to keep all of those
+snapshots, but if you pass this flag, it will be kept.
 .RE
 .PP
 
-\fB\-r, \-\-remote\fR <address>
+\fB\-p, \-\-port\fR \fIport\fR
+.RS 4
+The remote port. Used with \fB--remote\fR.
+.RE
+.PP
+
+\fB\-q, \-\-quiet\fR
+.RS 4
+Do not send notifications to notify system if it is available. Instead print
+notifications to stdout.
+.RE
+.PP
+
+\fB\-r, \-\-remote\fR \fIaddress\fR
 .RS 4
 Send the snapshot backup to a remote machine. The snapshot will be sent via ssh. You
 should specify the remote machine's hostname or ip address. The 'root' user must be
@@ -69,13 +95,19 @@ permitted to login on the remote machine.
 .RE
 .PP
 
-\fB\-s, \-\-subvolid\fR <subvolid>
+\fB\-\-sudo\fR
+.RS 4
+Use sudo on the remote machine. Only valid when used with the \fB\-\-remote\fR flag.
+.RE
+.PP
+
+\fB\-s, \-\-subvolid\fR \fIsubvolid\fR
 .RS 4
 Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults to 5.
 .RE
 .PP
 
-\fB\-u, \-\-UUID\fR <UUID>
+\fB\-u, \-\-UUID\fR \fIUUID\fR
 .RS 4
 Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
 If multiple mount points are found with the same UUID and subvolid, will prompt user.
@@ -84,13 +116,16 @@ If multiple mount points are found with the same UUID and subvolid, will prompt 
 
 .SH EXAMPLES
 .PP
-snap-sync
+\fBsnap-sync\fR
 .RS 4
 Get prompted interactively on what disks to backup to and what snapshots to send.
 .RE
 
 .PP
-snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
+.B
+snap-sync 
+\fB--UUID\fR \fI7360922b-c916-4d9f-a670-67fe0b91143c\fR \fB--subvolid\fR \fI5\fR
+\fB--noconfirm\fR
 .RS 4
 Specify the UUID and subvolume of the external disk, backing up all subvolumes with a
 snapper configuration without promptin for confirmation.
@@ -136,7 +171,7 @@ And here is its corresponding timer:
 https://github.com/wesbarnett/snap-sync
 
 .SH AUTHORS
-Wes Barnett <wes@wbarnett.us>
+Wes Barnett wes@wbarnett.us
 
 .SH SEE ALSO
 .BR btrfs-send (8),

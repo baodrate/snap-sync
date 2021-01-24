@@ -54,30 +54,6 @@ if [[ $? -ne 0 ]]; then
     doprogress=1
 fi
 
-notify() {
-    for u in $(users | tr ' ' '\n' | sort -u); do
-        sudo -u $u DISPLAY=:0 \
-        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
-        notify-send -a $name "$1" "$2" --icon="dialog-$3"
-    done
-}
-
-notify_info() {
-    if [[ $donotify -eq 0 ]]; then
-        notify "$1" "$2" "information"
-    else
-        printf "$1: $2\n"
-    fi
-}
-
-notify_error() {
-    if [[ $donotify -eq 0 ]]; then
-        notify "$1" "$2" "error"
-    else
-        printf "$1: $2\n"
-    fi
-}
-
 error() { 
     printf "==> ERROR: %s\n" "$@"
     notify_error 'Error' 'Check journal for more information.'
@@ -114,8 +90,12 @@ Options:
  -d, --description <desc> snapper description
  -h, --help               print this message
  -n, --noconfirm          do not ask for confirmation
+ -k, --keepold            keep old incremental snapshots instead of deleting them
+                          after backup is performed
  -p, --port <port>        remote port; wsed with '--remote'.
+ -q, --quiet              do not send notifications; instead print them.
  -r, --remote <address>   ip address of a remote machine to backup to
+ --sudo                   use sudo on the remote machine
  -s, --subvolid <subvlid> subvolume id of the mounted BTRFS subvolume to back up to
  -u, --UUID <UUID>        UUID of the mounted BTRFS subvolume to back up to
 
@@ -123,8 +103,8 @@ See 'man snap-sync' for more details.
 EOF
 }
 
-
 ssh=""
+sudo=0
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
@@ -144,6 +124,10 @@ while [[ $# -gt 0 ]]; do
             subvolid_cmdline="$2"
             shift 2
         ;;
+        -k|--keepold)
+            keep="yes"
+            shift
+        ;;
         -n|--noconfirm)
             noconfirm="yes"
             shift
@@ -151,6 +135,10 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             usage
             exit 1
+        ;;
+        -q|--quiet)
+            donotify=1
+            shift
         ;;
 	    -r|--remote)
             remote=$2
@@ -160,11 +148,39 @@ while [[ $# -gt 0 ]]; do
             port=$2
             shift 2
 	    ;;
+        --sudo)
+            sudo=1
+            shift
+        ;;
         *)
             die "Unknown option: '$key'. Run '$name -h' for valid options."
         ;;
     esac
 done
+
+notify() {
+    for u in $(users | tr ' ' '\n' | sort -u); do
+        sudo -u $u DISPLAY=:0 \
+        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
+        notify-send -a $name "$1" "$2" --icon="dialog-$3"
+    done
+}
+
+notify_info() {
+    if [[ $donotify -eq 0 ]]; then
+        notify "$1" "$2" "information"
+    else
+        printf "$1: $2\n"
+    fi
+}
+
+notify_error() {
+    if [[ $donotify -eq 0 ]]; then
+        notify "$1" "$2" "error"
+    else
+        printf "$1: $2\n"
+    fi
+}
 
 [[ $EUID -ne 0 ]] && die "Script must be run as root. See '$name -h' for a description of options" 
 ! [[ -f $SNAPPER_CONFIG ]] && die "$SNAPPER_CONFIG does not exist."
@@ -192,6 +208,9 @@ if [[ -n $remote ]]; then
     ssh="ssh $remote"
     if [[ -n $port ]]; then
         ssh="$ssh -p $port"
+    fi
+    if [[ $sudo -eq 1 ]]; then
+        ssh="$ssh sudo"
     fi
 fi
 
@@ -464,8 +483,15 @@ for x in $selected_configs; do
         else
             btrfs send -c "$old_snap" "$new_snap" | $ssh btrfs receive "$backup_location"
         fi
-        printf "Modifying data for old local snapshot for '%s' configuration...\n" "$x" | tee $PIPE
-        snapper -v -c "$x" modify -d "old snap-sync snapshot (you may remove)" -u "backupdir=,subvolid=,uuid=" -c "number" "$old_num"
+
+        if [[ $keep == "yes" ]]; then
+            printf "Modifying data for old local snapshot for '%s' configuration...\n" "$x" | tee $PIPE
+            snapper -v -c "$x" modify -d "old snap-sync snapshot (you may remove)" -u "backupdir=,subvolid=,uuid=" -c "number" "$old_num"
+        else
+            printf "Deleting old snapshot for %s...\n" "$x" | tee $PIPE
+            snapper -c "$x" delete "$old_num"
+        fi
+
     fi
 
     if [[ -z $remote ]]; then
