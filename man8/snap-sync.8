@@ -13,6 +13,7 @@ snap-sync \- send incremental btrfs snapshots, keeping track of them with snappe
 [\fB--sudo\fR]
 [\fB-s\fR \fIsubvolid\fR] 
 [\fB-u\fR \fIUUID\fR]
+[\fB-k\fR]
 [\fB-q\fR]
 
 .SH DESCRIPTION
@@ -61,6 +62,15 @@ Print the help message.
 .RS 4
 Do not ask for confirmation for each configuration. Will still prompt for backup
 directory name on first backup.
+.RE
+.PP
+
+\fB\-k, \-\-keepold\fR
+.RS 4
+Keep the most recent local snapshot which is no longer needed.  By default, after a
+backup is performed for a snapper configuration, the previous local snapshot is deleted
+since a new local snapshot is created. It's not necessary to keep all of those
+snapshots, but if you pass this flag, it will be kept.
 .RE
 .PP
 
