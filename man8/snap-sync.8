@@ -12,6 +12,7 @@ snap-sync \- send incremental btrfs snapshots, keeping track of them with snappe
 [\fB-p\fR \fIport\fR] 
 [\fB-s\fR \fIsubvolid\fR] 
 [\fB-u\fR \fIUUID\fR]
+[\fB-q\fR]
 
 .SH DESCRIPTION
 
@@ -65,6 +66,13 @@ directory name on first backup.
 \fB\-p, \-\-port\fR \fIport\fR
 .RS 4
 The remote port. Used with \fB--remote\fR.
+.RE
+.PP
+
+\fB\-q, \-\-quiet\fR
+.RS 4
+Do not send notifications to notify system if it is available. Instead print
+notifications to stdout.
 .RE
 .PP
 
