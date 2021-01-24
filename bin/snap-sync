@@ -48,6 +48,12 @@ if [[ $? -ne 0 ]]; then
     donotify=1
 fi
 
+doprogress=0
+which pv &> /dev/null
+if [[ $? -ne 0 ]]; then
+    doprogress=1
+fi
+
 error() { 
     printf "==> ERROR: %s\n" "$@"
     notify_error 'Error' 'Check journal for more information.'
@@ -459,8 +465,11 @@ for x in $selected_configs; do
 
     if [[ -z "$old_num" ]]; then
         printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
-        btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &>/dev/null
-
+        if [[ $doprogress -eq 0 ]]; then
+            btrfs send "$new_snap" | pv | $ssh btrfs receive "$backup_location" &>/dev/null
+        else
+            btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &>/dev/null
+        fi
     else
 
         printf "Sending incremental snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
@@ -469,7 +478,11 @@ for x in $selected_configs; do
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
 
-        btrfs send -c "$old_snap" "$new_snap" | $ssh btrfs receive "$backup_location"
+        if [[ $doprogress -eq 0 ]]; then
+            btrfs send -c "$old_snap" "$new_snap" | pv | $ssh btrfs receive "$backup_location"
+        else
+            btrfs send -c "$old_snap" "$new_snap" | $ssh btrfs receive "$backup_location"
+        fi
 
         if [[ $keep == "yes" ]]; then
             printf "Modifying data for old local snapshot for '%s' configuration...\n" "$x" | tee $PIPE
