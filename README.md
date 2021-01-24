@@ -39,6 +39,23 @@ Starting with release 0.6, the tarballs are signed with my key with fingerprint
 `F7B28C61944FE30DABEEB0B01070BCC98C18BD66` ([public key]). Previous tarballs and commits
 used a different key with fingerprint `8535CEF3F3C38EE69555BF67E4B5E45AA3B8C5C3`.
 
+## Dependencies
+
+### Mandatory dependencies:
+
+* bash
+* snapper
+* btrfs-progs
+* awk
+* util-linux
+* sed
+* openssh-clients
+
+### Optional dependencies:
+
+* pv
+* notify-send
+
 ## Documentation
 
 See `snap-sync(8)` after installation.
