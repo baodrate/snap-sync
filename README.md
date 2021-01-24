@@ -16,9 +16,17 @@ have to be sent.
 
 ## Installation
 
+### Arch Linux
+
 Install the `snap-sync` package using pacman if using Arch Linux.
 
-Alternatively, download the latest release and signature from the [releases page], verify the download, and then
+### Fedora
+
+Install the `snap-sync` package from [this Copr] created by [@brndd].
+
+### Manual
+
+Download the latest release and signature from the [releases page], verify the download, and then
 run `make install`. snapper is required.
 
 If your system uses a non-default location for the snapper
@@ -30,7 +38,6 @@ configuration file, specify it on the command line with
 Starting with release 0.6, the tarballs are signed with my key with fingerprint
 `F7B28C61944FE30DABEEB0B01070BCC98C18BD66` ([public key]). Previous tarballs and commits
 used a different key with fingerprint `8535CEF3F3C38EE69555BF67E4B5E45AA3B8C5C3`.
-
 
 ## Documentation
 
@@ -50,6 +57,8 @@ tackle an open issue.
 
 See [@rzerres's fork] which has several enhancments.
 
+[this Copr]: https://copr.fedorainfracloud.org/coprs/peoinas/snap-sync/
+[@brndd]: https://github.com/brndd
 [releases page]: https://github.com/wesbarnett/snap-sync/releases
 [public key]: https://barnett.science/public-key.asc
 [issues page]: https://github.com/wesbarnett/snap-sync/issues
