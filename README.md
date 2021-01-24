@@ -53,8 +53,8 @@ used a different key with fingerprint `8535CEF3F3C38EE69555BF67E4B5E45AA3B8C5C3`
 
 ### Optional dependencies:
 
-* pv
-* notify-send
+* pv (for progress bar during backup)
+* notify-send (for desktop notifications)
 
 ## Documentation
 
