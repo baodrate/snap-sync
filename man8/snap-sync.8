@@ -12,6 +12,7 @@ snap-sync \- send incremental btrfs snapshots, keeping track of them with snappe
 [\fB-p\fR \fIport\fR] 
 [\fB--sudo\fR]
 [\fB-s\fR \fIsubvolid\fR] 
+[\fB-m\fR \fImountpoint\fR] 
 [\fB-u\fR \fIUUID\fR]
 [\fB-k\fR]
 [\fB-q\fR]
@@ -110,7 +111,15 @@ Specify the subvolume id of the mounted BTRFS subvolume to back up to. Defaults 
 \fB\-u, \-\-UUID\fR \fIUUID\fR
 .RS 4
 Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt.
-If multiple mount points are found with the same UUID and subvolid, will prompt user.
+If multiple mount points are found with the same UUID and subvolid, will prompt user,
+or user can specify mount point manually with \fB-m\fR.
+.RE
+.PP
+
+\fB\-m, \-\-mountpoint\fR \fImount point\fR
+.RS 4
+Specify the mount point of the disk to back up to. Useful if multiple mount points
+are used for the same disk.
 .RE
 .PP
 
