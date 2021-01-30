@@ -138,15 +138,18 @@ You can create systemd unit and timer. Here is an example service:
 .EX
 
     [Unit]
-    Description=Run snap-sync backup 
-
-    [Install]
-    WantedBy=multi-user.target
+    Description=Run snap-sync backup
+    Documentation=man:snap-sync(8)
 
     [Service]
     Type=simple
-    ExecStart=/usr/bin/snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm
-
+    ExecStart=/usr/bin/snap-sync --UUID 7360922b-c916-4d9f-a670-67fe0b91143c --subvolid 5 --noconfirm --quiet
+    IOSchedulingClass=idle
+    CPUSchedulingPolicy=idle
+    
+    [Install]
+    WantedBy=multi-user.target
+    
 .EE
 
 And here is its corresponding timer:
@@ -155,6 +158,7 @@ And here is its corresponding timer:
 
     [Unit]
     Description=Run snap-sync weekly
+    Documentation=man:snap-sync(8)
 
     [Timer]
     OnCalendar=weekly
