@@ -255,7 +255,7 @@ if [[ -z "$mount_cmdline" ]]; then
 else
     for x in $UUIDS; do
         UUIDS_ARRAY[$i]=$x
-        if [[ "$x" == "$uuid_cmdline" && ${SUBVOLIDS_ARRAY[$((i))]} == "$subvolid_cmdline" && ${TARGETS_ARRAY[$((i))]} == "$mount_cmdline"]]; then
+        if [[ "$x" == "$uuid_cmdline" && ${SUBVOLIDS_ARRAY[$((i))]} == "$subvolid_cmdline" && ${TARGETS_ARRAY[$((i))]} == "$mount_cmdline" ]]; then
             disk=$i
             disk_count=$(($disk_count+1))
         fi
@@ -274,7 +274,7 @@ fi
 
 if [[ "$disk" == -1 ]]; then
     if [[ "$disk_count" == 0 && "$uuid_cmdline" != "none" ]]; then
-        error "A device with UUID $uuid_cmdline and subvolid $subvolid_cmdline was not found to be mounted, or it is not a BTRFS device."
+        error "A device with UUID $uuid_cmdline and subvolid $subvolid_cmdline was not found to be mounted, or it is not a BTRFS device, or you specified an invalid mount point"
     fi
     if [[ -z $ssh ]]; then
         printf "Select a mounted BTRFS device on your local machine to backup to.\nFor more options, exit and run '$name -h'.\n"
