@@ -43,18 +43,25 @@ used a different key with fingerprint `8535CEF3F3C38EE69555BF67E4B5E45AA3B8C5C3`
 
 ### Mandatory dependencies:
 
+The dependencies below are Arch Linux package names. Packages on other distros may use different names.
+
 * bash
-* snapper
 * btrfs-progs
-* awk
+* coreutils
+* gawk
+* grep
+* snapper
+* systemd
 * util-linux
-* sed
-* openssh-clients
+* which
 
 ### Optional dependencies:
 
+* libnotify (for desktop notifications)
+* openssh (for remote backups)
 * pv (for progress bar during backup)
-* notify-send (for desktop notifications)
+* rsync (for remote backups)
+* sudo (for desktop notifications)
 
 ## Documentation
 
