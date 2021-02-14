@@ -43,14 +43,12 @@ systemd-cat -t "$name" < "$PIPE" &
 exec 3>"$PIPE"
 
 donotify=0
-which notify-send &> /dev/null
-if [[ $? -ne 0 ]]; then
+if ! which notify-send &> /dev/null; then
     donotify=1
 fi
 
 doprogress=0
-which pv &> /dev/null
-if [[ $? -ne 0 ]]; then
+if ! which pv &> /dev/null; then
     doprogress=1
 fi
 
