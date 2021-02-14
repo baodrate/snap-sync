@@ -382,7 +382,7 @@ for x in $selected_configs; do
     if [[ -z $ssh ]]; then
         printf "Will backup %s to %s\n" "$new_snap" "$backup_location/snapshot" | tee "$PIPE"
     else
-        printf "Will backup %s to %s\n" "$new_snap" "$remote":"$backup_location/snapshot" | tee "$PIPE"
+        printf "Will backup %s to %s\n" "$new_snap" "$remote:$backup_location/snapshot" | tee "$PIPE"
     fi
 
     if ($ssh test -d "$backup_location/snapshot") ; then
