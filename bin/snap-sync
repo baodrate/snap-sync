@@ -241,7 +241,7 @@ for x in $UUIDS; do
     UUIDS_ARRAY[$i]=$x
     if [[ "$x" == "$uuid_cmdline" && ${SUBVOLIDS_ARRAY[$((i))]} == "$subvolid_cmdline" ]]; then
         disk=$i
-        disk_count=$(($disk_count+1))
+        disk_count=$((disk_count+1))
     fi
     i=$((i+1))
 done
@@ -278,7 +278,7 @@ if [[ "$disk" == -1 ]]; then
     if [[ $disk == 0 ]]; then
         exit 0
     fi
-    disk=$(($disk-1))
+    disk=$((disk-1))
 fi
 
 selected_subvolid="${SUBVOLIDS_ARRAY[$((disk))]}"
@@ -418,7 +418,7 @@ for x in $selected_configs; do
         snapper -c $x delete $new_num
     fi
 
-    i=$(($i+1))
+    i=$((i+1))
 
 done
 
@@ -427,7 +427,7 @@ printf "\nPerforming backups...\n" | tee $PIPE
 i=-1
 for x in $selected_configs; do
 
-    i=$(($i+1))
+    i=$((i+1))
 
     SNAP_SYNC_EXCLUDE=no
 
