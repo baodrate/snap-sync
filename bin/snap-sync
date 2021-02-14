@@ -250,7 +250,7 @@ if [[ "${#UUIDS_ARRAY[$@]}" -eq 0 ]]; then
     die "No external btrfs subvolumes found to backup to. Run '$name -h' for more options."
 fi
 
-if [[ "$disk_count" > 1 ]]; then
+if [[ "$disk_count" -gt 1 ]]; then
     printf "Multiple mount points were found with UUID %s and subvolid %s.\n" "$uuid_cmdline" "$subvolid_cmdline"
     disk="-1"
 fi
