@@ -89,7 +89,8 @@ Options:
  -c, --config <config>    snapper configuration to backup
  -d, --description <desc> snapper description
  -h, --help               print this message
- -i, --identity_file      identity file used for the remote SSH connection;
+ -i, --identity_file <identity_file_path>
+                          identity file used for the remote SSH connection;
                           used with '--remote'
  -n, --noconfirm          do not ask for confirmation
  -k, --keepold            keep old incremental snapshots instead of deleting them
