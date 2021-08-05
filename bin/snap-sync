@@ -54,12 +54,12 @@ if [[ $? -ne 0 ]]; then
     doprogress=1
 fi
 
-error() { 
+error() {
     printf "==> ERROR: %s\n" "$@"
     notify_error 'Error' 'Check journal for more information.'
 } >&2
 
-die() { 
+die() {
     error "$@"
     exit 1
 }
@@ -73,8 +73,8 @@ traperror() {
     exit 1
 }
 
-trapkill() { 
-    die "Exited due to user intervention." 
+trapkill() {
+    die "Exited due to user intervention."
 }
 
 trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
@@ -92,7 +92,7 @@ Options:
  -n, --noconfirm          do not ask for confirmation
  -k, --keepold            keep old incremental snapshots instead of deleting them
                           after backup is performed
- -p, --port <port>        remote port; wsed with '--remote'.
+ -p, --port <port>        remote port; used with '--remote'.
  -q, --quiet              do not send notifications; instead print them.
  -r, --remote <address>   ip address of a remote machine to backup to
  --sudo                   use sudo on the remote machine
@@ -182,7 +182,7 @@ notify_error() {
     fi
 }
 
-[[ $EUID -ne 0 ]] && die "Script must be run as root. See '$name -h' for a description of options" 
+[[ $EUID -ne 0 ]] && die "Script must be run as root. See '$name -h' for a description of options"
 ! [[ -f $SNAPPER_CONFIG ]] && die "$SNAPPER_CONFIG does not exist."
 
 description=${description:-"latest incremental backup"}
@@ -347,7 +347,7 @@ for x in $selected_configs; do
         die "Selected snapper configuration $x does not exist."
     fi
 
-    if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
+    if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then
         continue
     fi
 
@@ -438,7 +438,7 @@ for x in $selected_configs; do
     fi
 
     cont_backup=${CONT_BACKUP_ARRAY[$i]}
-    if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
+    if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then
         notify_info "Backup in progress" "NOTE: Skipping $x configuration."
         continue
     fi
@@ -464,7 +464,7 @@ for x in $selected_configs; do
     $ssh mkdir -p $backup_location
 
     if [[ -z "$old_num" ]]; then
-        printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
+        printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE
         if [[ $doprogress -eq 0 ]]; then
             btrfs send "$new_snap" | pv | $ssh btrfs receive "$backup_location" &>/dev/null
         else
@@ -472,7 +472,7 @@ for x in $selected_configs; do
         fi
     else
 
-        printf "Sending incremental snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
+        printf "Sending incremental snapshot for '%s' configuration...\n" "$x" | tee $PIPE
         # Sends the difference between the new snapshot and old snapshot to the
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
