@@ -10,6 +10,7 @@ snap-sync \- send incremental btrfs snapshots, keeping track of them with snappe
 [\fB-n\fR] 
 [\fB-r\fR \fIaddress\fR] 
 [\fB-p\fR \fIport\fR] 
+[\fB-i\fR \fIidentity-file\fR]
 [\fB--sudo\fR]
 [\fB-s\fR \fIsubvolid\fR] 
 [\fB-u\fR \fIUUID\fR]
@@ -77,6 +78,13 @@ snapshots, but if you pass this flag, it will be kept.
 \fB\-p, \-\-port\fR \fIport\fR
 .RS 4
 The remote port. Used with \fB--remote\fR.
+.RE
+.PP
+
+\fB\-i, \-\-identity-file\fR \fIidentity_file_path\fR
+.RS 4
+The identity file for the SSH connection to a remote server. Used with \fB--remote\fR.
+You can usually find these files in your users '.ssh' folder with a name like 'id_rsa'.
 .RE
 .PP
 
