@@ -39,17 +39,17 @@ SNAPPER_CONFIG=/etc/conf.d/snapper
 TMPDIR=$(mktemp -d)
 PIPE=$TMPDIR/$name.out
 mkfifo $PIPE
-systemd-cat -t "$name" <$PIPE &
-exec 3>$PIPE
+systemd-cat -t "$name" < $PIPE &
+exec 3> $PIPE
 
 donotify=0
-which notify-send &>/dev/null
+which notify-send &> /dev/null
 if [[ $? -ne 0 ]]; then
     donotify=1
 fi
 
 doprogress=0
-which pv &>/dev/null
+which pv &> /dev/null
 if [[ $? -ne 0 ]]; then
     doprogress=1
 fi
@@ -81,7 +81,7 @@ trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
 trap trapkill SIGTERM SIGINT
 
 usage() {
-    cat <<EOF
+    cat << EOF
 $name $version
 Usage: $name [options]
 
@@ -358,7 +358,7 @@ for x in $selected_configs; do
     fi
 
     printf "\n"
-    s
+
     old_num=$(snapper -c "$x" list -t single | awk '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {print $1}')
     old_snap=$SUBVOLUME/.snapshots/$old_num/snapshot
 
@@ -468,9 +468,9 @@ for x in $selected_configs; do
     if [[ -z "$old_num" ]]; then
         printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE
         if [[ $doprogress -eq 0 ]]; then
-            btrfs send "$new_snap" | pv | $ssh btrfs receive "$backup_location" &>/dev/null
+            btrfs send "$new_snap" | pv | $ssh btrfs receive "$backup_location" &> /dev/null
         else
-            btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &>/dev/null
+            btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &> /dev/null
         fi
     else
 
@@ -519,7 +519,7 @@ for x in $selected_configs; do
     printf "Tagging local snapshot as latest backup for '%s' configuration...\n" "$x" | tee $PIPE
     snapper -v -c "$x" modify -d "$description" -u "$userdata" "$new_num"
 
-    printf "Backup complete for '%s' configuration.\n" "$x" >$PIPE
+    printf "Backup complete for '%s' configuration.\n" "$x" > $PIPE
 
 done
 
