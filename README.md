@@ -1,5 +1,8 @@
 # snap-sync
 
+**NOTE**: Repository will be archived soon. See [Issue #114](https://github.com/wesbarnett/snap-sync/issues/114).
+
+
 This bash script sends incremental snapshots to another drive for backing up
 data. Plug in and mount any btrfs-formatted device you want your system to be
 backed up to (like a USB drive).  When you run the script you will be prompted
