@@ -1,6 +1,6 @@
 # snap-sync
 
-**NOTE**: Repository will be archived soon. See [Issue #114](https://github.com/wesbarnett/snap-sync/issues/114).
+**NOTE**: Repository has been archived. See [Issue #114](https://github.com/wesbarnett/snap-sync/issues/114).
 
 
 This bash script sends incremental snapshots to another drive for backing up
