@@ -40,7 +40,7 @@ TMPDIR=$(mktemp -d)
 PIPE=$TMPDIR/$name.out
 mkfifo $PIPE
 systemd-cat -t "$name" < $PIPE &
-exec 3>$PIPE
+exec 3> $PIPE
 
 donotify=0
 which notify-send &> /dev/null
@@ -54,12 +54,12 @@ if [[ $? -ne 0 ]]; then
     doprogress=1
 fi
 
-error() { 
+error() {
     printf "==> ERROR: %s\n" "$@"
     notify_error 'Error' 'Check journal for more information.'
 } >&2
 
-die() { 
+die() {
     error "$@"
     exit 1
 }
@@ -73,15 +73,15 @@ traperror() {
     exit 1
 }
 
-trapkill() { 
-    die "Exited due to user intervention." 
+trapkill() {
+    die "Exited due to user intervention."
 }
 
 trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
 trap trapkill SIGTERM SIGINT
 
 usage() {
-  cat <<EOF
+    cat << EOF
 $name $version
 Usage: $name [options]
 
@@ -89,11 +89,14 @@ Options:
  -c, --config <config>    snapper configuration to backup
  -d, --description <desc> snapper description
  -h, --help               print this message
+ -i, --identity_file <identity_file_path>
+                          identity file used for the remote SSH connection;
+                          used with '--remote'
  -n, --noconfirm          do not ask for confirmation
  -k, --keepold            keep old incremental snapshots instead of deleting them
                           after backup is performed
- -p, --port <port>        remote port; wsed with '--remote'.
- -q, --quiet              do not send notifications; instead print them.
+ -p, --port <port>        remote port; used with '--remote'
+ -q, --quiet              do not send notifications; instead print them
  -r, --remote <address>   ip address of a remote machine to backup to
  --sudo                   use sudo on the remote machine
  -s, --subvolid <subvlid> subvolume id of the mounted BTRFS subvolume to back up to
@@ -108,61 +111,65 @@ sudo=0
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
-        -d|--description)
+        -d | --description)
             description="$2"
             shift 2
-        ;;
-        -c|--config)
+            ;;
+        -c | --config)
             selected_configs="$2"
             shift 2
-        ;;
-        -u|--UUID)
+            ;;
+        -u | --UUID)
             uuid_cmdline="$2"
             shift 2
-        ;;
-        -s|--subvolid)
+            ;;
+        -s | --subvolid)
             subvolid_cmdline="$2"
             shift 2
-        ;;
-        -k|--keepold)
+            ;;
+        -k | --keepold)
             keep="yes"
             shift
-        ;;
-        -n|--noconfirm)
+            ;;
+        -n | --noconfirm)
             noconfirm="yes"
             shift
-        ;;
-        -h|--help)
+            ;;
+        -h | --help)
             usage
             exit 1
-        ;;
-        -q|--quiet)
+            ;;
+        -q | --quiet)
             donotify=1
             shift
-        ;;
-	    -r|--remote)
+            ;;
+        -r | --remote)
             remote=$2
             shift 2
-	    ;;
-	    -p|--port)
+            ;;
+        -p | --port)
             port=$2
             shift 2
-	    ;;
+            ;;
         --sudo)
             sudo=1
             shift
-        ;;
+            ;;
+        -i | --identity-file)
+            identity_file=$2
+            shift 2
+            ;;
         *)
             die "Unknown option: '$key'. Run '$name -h' for valid options."
-        ;;
+            ;;
     esac
 done
 
 notify() {
     for u in $(users | tr ' ' '\n' | sort -u); do
         sudo -u $u DISPLAY=:0 \
-        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
-        notify-send -a $name "$1" "$2" --icon="dialog-$3"
+            DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
+            notify-send -a $name "$1" "$2" --icon="dialog-$3"
     done
 }
 
@@ -182,7 +189,7 @@ notify_error() {
     fi
 }
 
-[[ $EUID -ne 0 ]] && die "Script must be run as root. See '$name -h' for a description of options" 
+[[ $EUID -ne 0 ]] && die "Script must be run as root. See '$name -h' for a description of options"
 ! [[ -f $SNAPPER_CONFIG ]] && die "$SNAPPER_CONFIG does not exist."
 
 description=${description:-"latest incremental backup"}
@@ -206,6 +213,9 @@ fi
 
 if [[ -n $remote ]]; then
     ssh="ssh $remote"
+    if [[ -n $identity_file ]]; then
+        ssh="$ssh -i $identity_file"
+    fi
     if [[ -n $port ]]; then
         ssh="$ssh -p $port"
     fi
@@ -231,7 +241,7 @@ i=0
 for x in $TARGETS; do
     SUBVOLIDS_ARRAY[$i]=$($ssh btrfs subvolume show $x | awk '/Subvolume ID:/ { print $3 }')
     TARGETS_ARRAY[$i]=$x
-    i=$((i+1))
+    i=$((i + 1))
 done
 
 i=0
@@ -241,9 +251,9 @@ for x in $UUIDS; do
     UUIDS_ARRAY[$i]=$x
     if [[ "$x" == "$uuid_cmdline" && ${SUBVOLIDS_ARRAY[$((i))]} == "$subvolid_cmdline" ]]; then
         disk=$i
-        disk_count=$(($disk_count+1))
+        disk_count=$(($disk_count + 1))
     fi
-    i=$((i+1))
+    i=$((i + 1))
 done
 
 if [[ "${#UUIDS_ARRAY[$@]}" -eq 0 ]]; then
@@ -266,7 +276,7 @@ if [[ "$disk" == -1 ]]; then
     fi
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
         for x in "${!TARGETS_ARRAY[@]}"; do
-            printf "%4s) %s (uuid=%s, subvolid=%s)\n" "$((x+1))" "${TARGETS_ARRAY[$x]}" "${UUIDS_ARRAY[$x]}" "${SUBVOLIDS_ARRAY[$x]}"
+            printf "%4s) %s (uuid=%s, subvolid=%s)\n" "$((x + 1))" "${TARGETS_ARRAY[$x]}" "${UUIDS_ARRAY[$x]}" "${SUBVOLIDS_ARRAY[$x]}"
         done
         printf "%4s) Exit\n" "0"
         read -e -r -p "Enter a number: " disk
@@ -278,7 +288,7 @@ if [[ "$disk" == -1 ]]; then
     if [[ $disk == 0 ]]; then
         exit 0
     fi
-    disk=$(($disk-1))
+    disk=$(($disk - 1))
 fi
 
 selected_subvolid="${SUBVOLIDS_ARRAY[$((disk))]}"
@@ -323,13 +333,9 @@ for x in $selected_configs; do
             printf "'noconfirm' option passed. Failed backups will not be deleted.\n" | tee $PIPE
         else
             read -e -r -p "Delete failed backup snapshot(s)? (These local snapshots from failed backups are not used.) [y/N]? " delete_failed
-            while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
-                "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
-                "$delete_failed" != [Nn] ]]; do
+            while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" && "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" && "$delete_failed" != [Nn] ]]; do
                 read -e -r -p "Delete failed backup snapshot(s)? (These local snapshots from failed backups are not used.) [y/N] " delete_failed
-                if [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
-                "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" &&
-                "$delete_failed" != [Nn] ]]; then
+                if [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" && "$delete_failed" != [Yy] && "$delete_failed" != [Nn]"o" && "$delete_failed" != [Nn] ]]; then
                     printf "Select 'y' or 'N'.\n"
                 fi
             done
@@ -347,7 +353,7 @@ for x in $selected_configs; do
         die "Selected snapper configuration $x does not exist."
     fi
 
-    if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
+    if [[ $SNAP_SYNC_EXCLUDE == "yes" ]]; then
         continue
     fi
 
@@ -385,7 +391,7 @@ for x in $selected_configs; do
         printf "Will backup %s to %s\n" "$new_snap" "$remote":"$backup_location/snapshot" | tee $PIPE
     fi
 
-    if ($ssh test -d "$backup_location/snapshot") ; then
+    if ($ssh test -d "$backup_location/snapshot"); then
         printf "WARNING: Backup directory '%s' already exists. This configuration will be skipped!\n" "$backup_location/snapshot" | tee $PIPE
         printf "Move or delete destination directory and try backup again.\n" | tee $PIPE
     fi
@@ -400,13 +406,9 @@ for x in $selected_configs; do
     if [[ $noconfirm == "yes" ]]; then
         cont_backup="yes"
     else
-        while [[ -n "$cont_backup" && "$cont_backup" != [Yy]"es" &&
-            "$cont_backup" != [Yy] && "$cont_backup" != [Nn]"o" &&
-            "$cont_backup" != [Nn] ]]; do
+        while [[ -n "$cont_backup" && "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] && "$cont_backup" != [Nn]"o" && "$cont_backup" != [Nn] ]]; do
             read -e -r -p "Proceed with backup of '$x' configuration [Y/n]? " cont_backup
-            if [[ -n "$cont_backup" && "$cont_backup" != [Yy]"es" &&
-            "$cont_backup" != [Yy] && "$cont_backup" != [Nn]"o" &&
-            "$cont_backup" != [Nn] ]]; then
+            if [[ -n "$cont_backup" && "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] && "$cont_backup" != [Nn]"o" && "$cont_backup" != [Nn] ]]; then
                 printf "Select 'Y' or 'n'.\n"
             fi
         done
@@ -418,7 +420,7 @@ for x in $selected_configs; do
         snapper -c $x delete $new_num
     fi
 
-    i=$(($i+1))
+    i=$(($i + 1))
 
 done
 
@@ -427,7 +429,7 @@ printf "\nPerforming backups...\n" | tee $PIPE
 i=-1
 for x in $selected_configs; do
 
-    i=$(($i+1))
+    i=$(($i + 1))
 
     SNAP_SYNC_EXCLUDE=no
 
@@ -438,7 +440,7 @@ for x in $selected_configs; do
     fi
 
     cont_backup=${CONT_BACKUP_ARRAY[$i]}
-    if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then 
+    if [[ $cont_backup == "no" || $SNAP_SYNC_EXCLUDE == "yes" ]]; then
         notify_info "Backup in progress" "NOTE: Skipping $x configuration."
         continue
     fi
@@ -456,7 +458,7 @@ for x in $selected_configs; do
     new_info="${NEW_INFO_ARRAY[$i]}"
     backup_location="${BACKUPLOC_ARRAY[$i]}"
 
-    if ($ssh test -d "$backup_location/snapshot") ; then
+    if ($ssh test -d "$backup_location/snapshot"); then
         printf "ERROR: Backup directory '%s' already exists. Skipping backup of this configuration!\n" "$backup_location/snapshot" | tee $PIPE
         continue
     fi
@@ -464,15 +466,15 @@ for x in $selected_configs; do
     $ssh mkdir -p $backup_location
 
     if [[ -z "$old_num" ]]; then
-        printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
+        printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE
         if [[ $doprogress -eq 0 ]]; then
-            btrfs send "$new_snap" | pv | $ssh btrfs receive "$backup_location" &>/dev/null
+            btrfs send "$new_snap" | pv | $ssh btrfs receive "$backup_location" &> /dev/null
         else
-            btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &>/dev/null
+            btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &> /dev/null
         fi
     else
 
-        printf "Sending incremental snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
+        printf "Sending incremental snapshot for '%s' configuration...\n" "$x" | tee $PIPE
         # Sends the difference between the new snapshot and old snapshot to the
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
@@ -497,10 +499,14 @@ for x in $selected_configs; do
     if [[ -z $remote ]]; then
         cp "$new_info" "$backup_location"
     else
-        if [[ -z $port ]]; then
-            rsync -avzq "$new_info" "$remote":"$backup_location"
-        else
+        if [[ -n $port && -n $identity_file ]]; then
+            rsync -avzqe "ssh -p $port -i $identity_file" "$new_info" "$remote":"$backup_location"
+        elif [[ -n $port ]]; then
             rsync -avzqe "ssh -p $port" "$new_info" "$remote":"$backup_location"
+        elif [[ -n $identity_file ]]; then
+            rsync -avzqe "ssh -i $identity_file" "$new_info" "$remote":"$backup_location"
+        else
+            rsync -avzq "$new_info" "$remote":"$backup_location"
         fi
     fi
 

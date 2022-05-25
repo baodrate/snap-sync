@@ -55,7 +55,7 @@ tackle an open issue.
 
 ## Related projects
 
-See [@rzerres's fork] which has several enhancments.
+See [@rzerres's fork] which has several enhancements.
 
 [this Copr]: https://copr.fedorainfracloud.org/coprs/peoinas/snap-sync/
 [@brndd]: https://github.com/brndd
