@@ -92,6 +92,7 @@ Options:
  -n, --noconfirm          do not ask for confirmation
  -k, --keepold            keep old incremental snapshots instead of deleting them
                           after backup is performed
+ -m, --mountpoint         optionally specify where subvolume is mounted if mounted in multiple locations
  -p, --port <port>        remote port; wsed with '--remote'.
  -q, --quiet              do not send notifications; instead print them.
  -r, --remote <address>   ip address of a remote machine to backup to
@@ -105,6 +106,7 @@ EOF
 
 ssh=""
 sudo=0
+mount_cmdline=""
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
@@ -122,6 +124,10 @@ while [[ $# -gt 0 ]]; do
         ;;
         -s|--subvolid)
             subvolid_cmdline="$2"
+            shift 2
+        ;;
+        -m|--mountpoint)
+            mount_cmdline="$2"
             shift 2
         ;;
         -k|--keepold)
@@ -237,14 +243,25 @@ done
 i=0
 disk=-1
 disk_count=0
-for x in $UUIDS; do
-    UUIDS_ARRAY[$i]=$x
-    if [[ "$x" == "$uuid_cmdline" && ${SUBVOLIDS_ARRAY[$((i))]} == "$subvolid_cmdline" ]]; then
-        disk=$i
-        disk_count=$(($disk_count+1))
-    fi
-    i=$((i+1))
-done
+if [[ -z "$mount_cmdline" ]]; then
+    for x in $UUIDS; do
+        UUIDS_ARRAY[$i]=$x
+        if [[ "$x" == "$uuid_cmdline" && ${SUBVOLIDS_ARRAY[$((i))]} == "$subvolid_cmdline" ]]; then
+            disk=$i
+            disk_count=$(($disk_count+1))
+        fi
+        i=$((i+1))
+    done
+else
+    for x in $UUIDS; do
+        UUIDS_ARRAY[$i]=$x
+        if [[ "$x" == "$uuid_cmdline" && ${SUBVOLIDS_ARRAY[$((i))]} == "$subvolid_cmdline" && ${TARGETS_ARRAY[$((i))]} == "$mount_cmdline" ]]; then
+            disk=$i
+            disk_count=$(($disk_count+1))
+        fi
+        i=$((i+1))
+    done
+fi
 
 if [[ "${#UUIDS_ARRAY[$@]}" -eq 0 ]]; then
     die "No external btrfs subvolumes found to backup to. Run '$name -h' for more options."
@@ -257,7 +274,7 @@ fi
 
 if [[ "$disk" == -1 ]]; then
     if [[ "$disk_count" == 0 && "$uuid_cmdline" != "none" ]]; then
-        error "A device with UUID $uuid_cmdline and subvolid $subvolid_cmdline was not found to be mounted, or it is not a BTRFS device."
+        error "A device with UUID $uuid_cmdline and subvolid $subvolid_cmdline was not found to be mounted, or it is not a BTRFS device, or you specified an invalid mount point"
     fi
     if [[ -z $ssh ]]; then
         printf "Select a mounted BTRFS device on your local machine to backup to.\nFor more options, exit and run '$name -h'.\n"
