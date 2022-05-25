@@ -38,19 +38,17 @@ SNAPPER_CONFIG=/etc/conf.d/snapper
 
 TMPDIR=$(mktemp -d)
 PIPE=$TMPDIR/$name.out
-mkfifo $PIPE
-systemd-cat -t "$name" < $PIPE &
-exec 3>$PIPE
+mkfifo "$PIPE"
+systemd-cat -t "$name" < "$PIPE" &
+exec 3>"$PIPE"
 
 donotify=0
-which notify-send &> /dev/null
-if [[ $? -ne 0 ]]; then
+if ! which notify-send &> /dev/null; then
     donotify=1
 fi
 
 doprogress=0
-which pv &> /dev/null
-if [[ $? -ne 0 ]]; then
+if ! which pv &> /dev/null; then
     doprogress=1
 fi
 
@@ -65,7 +63,7 @@ die() {
 }
 
 traperror() {
-    printf "Exited due to error on line %s.\n" $1
+    printf "Exited due to error on line %s.\n" "$1"
     printf "exit status: %s\n" "$2"
     printf "command: %s\n" "$3"
     printf "bash line: %s\n" "$4"
@@ -160,8 +158,8 @@ done
 
 notify() {
     for u in $(users | tr ' ' '\n' | sort -u); do
-        sudo -u $u DISPLAY=:0 \
-        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
+        sudo -u "$u" DISPLAY=:0 \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(sudo -u "$u" id -u)/bus" \
         notify-send -a $name "$1" "$2" --icon="dialog-$3"
     done
 }
@@ -170,7 +168,7 @@ notify_info() {
     if [[ $donotify -eq 0 ]]; then
         notify "$1" "$2" "information"
     else
-        printf "$1: $2\n"
+        printf '%s\n' "$1: $2"
     fi
 }
 
@@ -178,7 +176,7 @@ notify_error() {
     if [[ $donotify -eq 0 ]]; then
         notify "$1" "$2" "error"
     else
-        printf "$1: $2\n"
+        printf '%s\n' "$1: $2"
     fi
 }
 
@@ -216,8 +214,8 @@ fi
 
 if [[ "$($ssh findmnt -n -v --target / -o FSTYPE)" == "btrfs" ]]; then
     EXCLUDE_UUID=$($ssh findmnt -n -v -t btrfs --target / -o UUID)
-    TARGETS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $2}')
-    UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v $EXCLUDE_UUID | awk '{print $1}')
+    TARGETS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v "$EXCLUDE_UUID" | awk '{print $2}')
+    UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID,TARGET --list | grep -v "$EXCLUDE_UUID" | awk '{print $1}')
 else
     TARGETS=$($ssh findmnt -n -v -t btrfs -o TARGET --list)
     UUIDS=$($ssh findmnt -n -v -t btrfs -o UUID --list)
@@ -229,7 +227,7 @@ declare -a SUBVOLIDS_ARRAY
 
 i=0
 for x in $TARGETS; do
-    SUBVOLIDS_ARRAY[$i]=$($ssh btrfs subvolume show $x | awk '/Subvolume ID:/ { print $3 }')
+    SUBVOLIDS_ARRAY[$i]=$($ssh btrfs subvolume show "$x" | awk '/Subvolume ID:/ { print $3 }')
     TARGETS_ARRAY[$i]=$x
     i=$((i+1))
 done
@@ -241,7 +239,7 @@ for x in $UUIDS; do
     UUIDS_ARRAY[$i]=$x
     if [[ "$x" == "$uuid_cmdline" && ${SUBVOLIDS_ARRAY[$((i))]} == "$subvolid_cmdline" ]]; then
         disk=$i
-        disk_count=$(($disk_count+1))
+        disk_count=$((disk_count+1))
     fi
     i=$((i+1))
 done
@@ -250,7 +248,7 @@ if [[ "${#UUIDS_ARRAY[$@]}" -eq 0 ]]; then
     die "No external btrfs subvolumes found to backup to. Run '$name -h' for more options."
 fi
 
-if [[ "$disk_count" > 1 ]]; then
+if [[ "$disk_count" -gt 1 ]]; then
     printf "Multiple mount points were found with UUID %s and subvolid %s.\n" "$uuid_cmdline" "$subvolid_cmdline"
     disk="-1"
 fi
@@ -260,9 +258,9 @@ if [[ "$disk" == -1 ]]; then
         error "A device with UUID $uuid_cmdline and subvolid $subvolid_cmdline was not found to be mounted, or it is not a BTRFS device."
     fi
     if [[ -z $ssh ]]; then
-        printf "Select a mounted BTRFS device on your local machine to backup to.\nFor more options, exit and run '$name -h'.\n"
+        printf "Select a mounted BTRFS device on your local machine to backup to.\nFor more options, exit and run '%s -h'.\n" "$name"
     else
-        printf "Select a mounted BTRFS device on %s to backup to.\nFor more options, exit and run '$name -h'.\n" "$remote"
+        printf "Select a mounted BTRFS device on %s to backup to.\nFor more options, exit and run '%s -h'.\n" "$remote" "$name"
     fi
     while [[ $disk -lt 0 || $disk -gt $i ]]; do
         for x in "${!TARGETS_ARRAY[@]}"; do
@@ -278,20 +276,20 @@ if [[ "$disk" == -1 ]]; then
     if [[ $disk == 0 ]]; then
         exit 0
     fi
-    disk=$(($disk-1))
+    disk=$((disk-1))
 fi
 
 selected_subvolid="${SUBVOLIDS_ARRAY[$((disk))]}"
 selected_uuid="${UUIDS_ARRAY[$((disk))]}"
 selected_mnt="${TARGETS_ARRAY[$((disk))]}"
-printf "\nYou selected the disk with uuid=%s, subvolid=%s.\n" "$selected_uuid" "$selected_subvolid" | tee $PIPE
+printf "\nYou selected the disk with uuid=%s, subvolid=%s.\n" "$selected_uuid" "$selected_subvolid" | tee "$PIPE"
 if [[ -z $ssh ]]; then
-    printf "The disk is mounted at '%s'.\n" "$selected_mnt" | tee $PIPE
+    printf "The disk is mounted at '%s'.\n" "$selected_mnt" | tee "$PIPE"
 else
-    printf "The disk is mounted at '%s:%s'.\n" "$remote" "$selected_mnt" | tee $PIPE
+    printf "The disk is mounted at '%s:%s'.\n" "$remote" "$selected_mnt" | tee "$PIPE"
 fi
 
-source $SNAPPER_CONFIG
+source "$SNAPPER_CONFIG"
 
 if [[ -z $selected_configs ]]; then
     printf "\nInteractively cycling through all snapper configurations...\n"
@@ -312,15 +310,15 @@ declare -a CONT_BACKUP_ARRAY
 i=0
 for x in $selected_configs; do
 
-    if [[ "$(snapper -c $x list -t single | awk '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {cnt++} END {print cnt}')" -gt 1 ]]; then
+    if [[ "$(snapper -c "$x" list -t single | awk '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {cnt++} END {print cnt}')" -gt 1 ]]; then
         error "More than one snapper entry found with UUID $selected_uuid subvolid $selected_subvolid for configuration $x. Skipping configuration $x."
         continue
     fi
 
-    if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
-        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x" | tee $PIPE
+    if [[ "$(snapper -c "$x" list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
+        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x" | tee "$PIPE"
         if [[ $noconfirm == "yes" ]]; then
-            printf "'noconfirm' option passed. Failed backups will not be deleted.\n" | tee $PIPE
+            printf "'noconfirm' option passed. Failed backups will not be deleted.\n" | tee "$PIPE"
         else
             read -e -r -p "Delete failed backup snapshot(s)? (These local snapshots from failed backups are not used.) [y/N]? " delete_failed
             while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
@@ -334,7 +332,7 @@ for x in $selected_configs; do
                 fi
             done
             if [[ "$delete_failed" == [Yy]"es" || "$delete_failed" == [Yy] ]]; then
-                snapper -c $x delete $(snapper -c $x list | awk '/'$name' backup in progress/ {print $1}')
+                snapper -c "$x" delete "$(snapper -c "$x" list | awk '/'$name' backup in progress/ {print $1}')"
             fi
         fi
     fi
@@ -342,7 +340,7 @@ for x in $selected_configs; do
     SNAP_SYNC_EXCLUDE=no
 
     if [[ -f "/etc/snapper/configs/$x" ]]; then
-        source /etc/snapper/configs/$x
+        source "/etc/snapper/configs/$x"
     else
         die "Selected snapper configuration $x does not exist."
     fi
@@ -368,26 +366,26 @@ for x in $selected_configs; do
     else
         mybackupdir=$(snapper -c "$x" list -t single | awk -F"|" '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
-        $ssh test -d $BACKUPDIR || die "%s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid"
+        $ssh test -d "$BACKUPDIR" || die "%s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid"
     fi
     BACKUPDIRS_ARRAY[$i]="$BACKUPDIR"
     MYBACKUPDIR_ARRAY[$i]="$mybackupdir"
 
-    printf "Creating new local snapshot for '%s' configuration...\n" "$x" | tee $PIPE
+    printf "Creating new local snapshot for '%s' configuration...\n" "$x" | tee "$PIPE"
     new_num=$(snapper -c "$x" create --print-number -d "$name backup in progress")
     new_snap=$SUBVOLUME/.snapshots/$new_num/snapshot
     new_info=$SUBVOLUME/.snapshots/$new_num/info.xml
     sync
     backup_location=$BACKUPDIR/$x/$new_num/
     if [[ -z $ssh ]]; then
-        printf "Will backup %s to %s\n" "$new_snap" "$backup_location/snapshot" | tee $PIPE
+        printf "Will backup %s to %s\n" "$new_snap" "$backup_location/snapshot" | tee "$PIPE"
     else
-        printf "Will backup %s to %s\n" "$new_snap" "$remote":"$backup_location/snapshot" | tee $PIPE
+        printf "Will backup %s to %s\n" "$new_snap" "$remote:$backup_location/snapshot" | tee "$PIPE"
     fi
 
     if ($ssh test -d "$backup_location/snapshot") ; then
-        printf "WARNING: Backup directory '%s' already exists. This configuration will be skipped!\n" "$backup_location/snapshot" | tee $PIPE
-        printf "Move or delete destination directory and try backup again.\n" | tee $PIPE
+        printf "WARNING: Backup directory '%s' already exists. This configuration will be skipped!\n" "$backup_location/snapshot" | tee "$PIPE"
+        printf "Move or delete destination directory and try backup again.\n" | tee "$PIPE"
     fi
 
     NEW_NUM_ARRAY[$i]="$new_num"
@@ -414,25 +412,25 @@ for x in $selected_configs; do
 
     if [[ "$cont_backup" != [Yy]"es" && "$cont_backup" != [Yy] && -n "$cont_backup" ]]; then
         CONT_BACKUP_ARRAY[$i]="no"
-        printf "Not backing up '%s' configuration.\n" $x
-        snapper -c $x delete $new_num
+        printf "Not backing up '%s' configuration.\n" "$x"
+        snapper -c "$x" delete "$new_num"
     fi
 
-    i=$(($i+1))
+    i=$((i+1))
 
 done
 
 # Actual backing up
-printf "\nPerforming backups...\n" | tee $PIPE
+printf "\nPerforming backups...\n" | tee "$PIPE"
 i=-1
 for x in $selected_configs; do
 
-    i=$(($i+1))
+    i=$((i+1))
 
     SNAP_SYNC_EXCLUDE=no
 
     if [[ -f "/etc/snapper/configs/$x" ]]; then
-        source /etc/snapper/configs/$x
+        source "/etc/snapper/configs/$x"
     else
         die "Selected snapper configuration $x does not exist."
     fi
@@ -457,14 +455,14 @@ for x in $selected_configs; do
     backup_location="${BACKUPLOC_ARRAY[$i]}"
 
     if ($ssh test -d "$backup_location/snapshot") ; then
-        printf "ERROR: Backup directory '%s' already exists. Skipping backup of this configuration!\n" "$backup_location/snapshot" | tee $PIPE
+        printf "ERROR: Backup directory '%s' already exists. Skipping backup of this configuration!\n" "$backup_location/snapshot" | tee "$PIPE"
         continue
     fi
 
-    $ssh mkdir -p $backup_location
+    $ssh mkdir -p "$backup_location"
 
     if [[ -z "$old_num" ]]; then
-        printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
+        printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee "$PIPE"  
         if [[ $doprogress -eq 0 ]]; then
             btrfs send "$new_snap" | pv | $ssh btrfs receive "$backup_location" &>/dev/null
         else
@@ -472,7 +470,7 @@ for x in $selected_configs; do
         fi
     else
 
-        printf "Sending incremental snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
+        printf "Sending incremental snapshot for '%s' configuration...\n" "$x" | tee "$PIPE"  
         # Sends the difference between the new snapshot and old snapshot to the
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
@@ -485,10 +483,10 @@ for x in $selected_configs; do
         fi
 
         if [[ $keep == "yes" ]]; then
-            printf "Modifying data for old local snapshot for '%s' configuration...\n" "$x" | tee $PIPE
+            printf "Modifying data for old local snapshot for '%s' configuration...\n" "$x" | tee "$PIPE"
             snapper -v -c "$x" modify -d "old snap-sync snapshot (you may remove)" -u "backupdir=,subvolid=,uuid=" -c "number" "$old_num"
         else
-            printf "Deleting old snapshot for %s...\n" "$x" | tee $PIPE
+            printf "Deleting old snapshot for %s...\n" "$x" | tee "$PIPE"
             snapper -c "$x" delete "$old_num"
         fi
 
@@ -510,14 +508,14 @@ for x in $selected_configs; do
     userdata="backupdir=$mybackupdir, subvolid=$selected_subvolid, uuid=$selected_uuid"
 
     # Tag new snapshot as the latest
-    printf "Tagging local snapshot as latest backup for '%s' configuration...\n" "$x" | tee $PIPE
+    printf "Tagging local snapshot as latest backup for '%s' configuration...\n" "$x" | tee "$PIPE"
     snapper -v -c "$x" modify -d "$description" -u "$userdata" "$new_num"
 
-    printf "Backup complete for '%s' configuration.\n" "$x" > $PIPE
+    printf "Backup complete for '%s' configuration.\n" "$x" > "$PIPE"
 
 done
 
-printf "\nDone!\n" | tee $PIPE
+printf "\nDone!\n" | tee "$PIPE"
 exec 3>&-
 
 if [[ "$uuid_cmdline" != "none" ]]; then
