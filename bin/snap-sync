@@ -48,10 +48,15 @@ if [[ $? -ne 0 ]]; then
     donotify=1
 fi
 
-doprogress=0
-which pv &> /dev/null
-if [[ $? -ne 0 ]]; then
-    doprogress=1
+unset doprogress
+which mbuffer &> /dev/null
+if [[ $? -eq 0 ]]; then
+    doprogress="mbuffer -m 1G -v 3"
+else
+    which pv &> /dev/null
+    if [[ $? -eq 0 ]]; then
+        doprogress=pv
+    fi
 fi
 
 error() { 
@@ -465,8 +470,8 @@ for x in $selected_configs; do
 
     if [[ -z "$old_num" ]]; then
         printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
-        if [[ $doprogress -eq 0 ]]; then
-            btrfs send "$new_snap" | pv | $ssh btrfs receive "$backup_location" &>/dev/null
+        if [[ -v doprogress ]]; then
+            btrfs send "$new_snap" | $doprogress | $ssh btrfs receive "$backup_location" &>/dev/null
         else
             btrfs send "$new_snap" | $ssh btrfs receive "$backup_location" &>/dev/null
         fi
@@ -478,8 +483,8 @@ for x in $selected_configs; do
         # is an identical subvolume to the old snapshot at the receiving
         # location where it can get its data. This helps speed up the transfer.
 
-        if [[ $doprogress -eq 0 ]]; then
-            btrfs send -c "$old_snap" "$new_snap" | pv | $ssh btrfs receive "$backup_location"
+        if [[ -v doprogress ]]; then
+            btrfs send -c "$old_snap" "$new_snap" | $doprogress | $ssh btrfs receive "$backup_location"
         else
             btrfs send -c "$old_snap" "$new_snap" | $ssh btrfs receive "$backup_location"
         fi
