@@ -36,12 +36,6 @@ printf "snap-sync comes with ABSOLUTELY NO WARRANTY. This is free software, and 
 # find_snapper_config script
 SNAPPER_CONFIG=/etc/conf.d/snapper
 
-TMPDIR=$(mktemp -d)
-PIPE=$TMPDIR/$name.out
-mkfifo $PIPE
-systemd-cat -t "$name" < $PIPE &
-exec 3>$PIPE
-
 donotify=0
 which notify-send &> /dev/null
 if [[ $? -ne 0 ]]; then
@@ -284,11 +278,11 @@ fi
 selected_subvolid="${SUBVOLIDS_ARRAY[$((disk))]}"
 selected_uuid="${UUIDS_ARRAY[$((disk))]}"
 selected_mnt="${TARGETS_ARRAY[$((disk))]}"
-printf "\nYou selected the disk with uuid=%s, subvolid=%s.\n" "$selected_uuid" "$selected_subvolid" | tee $PIPE
+printf "\nYou selected the disk with uuid=%s, subvolid=%s.\n" "$selected_uuid" "$selected_subvolid"
 if [[ -z $ssh ]]; then
-    printf "The disk is mounted at '%s'.\n" "$selected_mnt" | tee $PIPE
+    printf "The disk is mounted at '%s'.\n" "$selected_mnt"
 else
-    printf "The disk is mounted at '%s:%s'.\n" "$remote" "$selected_mnt" | tee $PIPE
+    printf "The disk is mounted at '%s:%s'.\n" "$remote" "$selected_mnt"
 fi
 
 source $SNAPPER_CONFIG
@@ -318,9 +312,9 @@ for x in $selected_configs; do
     fi
 
     if [[ "$(snapper -c $x list -t single | awk '/'$name' backup in progress/ {cnt++} END {print cnt}')" -gt 0 ]]; then
-        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x" | tee $PIPE
+        printf "\nNOTE: Previous failed %s backup snapshots found for '%s'.\n" "$name" "$x"
         if [[ $noconfirm == "yes" ]]; then
-            printf "'noconfirm' option passed. Failed backups will not be deleted.\n" | tee $PIPE
+            printf "'noconfirm' option passed. Failed backups will not be deleted.\n"
         else
             read -e -r -p "Delete failed backup snapshot(s)? (These local snapshots from failed backups are not used.) [y/N]? " delete_failed
             while [[ -n "$delete_failed" && "$delete_failed" != [Yy]"es" &&
@@ -373,21 +367,21 @@ for x in $selected_configs; do
     BACKUPDIRS_ARRAY[$i]="$BACKUPDIR"
     MYBACKUPDIR_ARRAY[$i]="$mybackupdir"
 
-    printf "Creating new local snapshot for '%s' configuration...\n" "$x" | tee $PIPE
+    printf "Creating new local snapshot for '%s' configuration...\n" "$x"
     new_num=$(snapper -c "$x" create --print-number -d "$name backup in progress")
     new_snap=$SUBVOLUME/.snapshots/$new_num/snapshot
     new_info=$SUBVOLUME/.snapshots/$new_num/info.xml
     sync
     backup_location=$BACKUPDIR/$x/$new_num/
     if [[ -z $ssh ]]; then
-        printf "Will backup %s to %s\n" "$new_snap" "$backup_location/snapshot" | tee $PIPE
+        printf "Will backup %s to %s\n" "$new_snap" "$backup_location/snapshot"
     else
-        printf "Will backup %s to %s\n" "$new_snap" "$remote":"$backup_location/snapshot" | tee $PIPE
+        printf "Will backup %s to %s\n" "$new_snap" "$remote":"$backup_location/snapshot"
     fi
 
     if ($ssh test -d "$backup_location/snapshot") ; then
-        printf "WARNING: Backup directory '%s' already exists. This configuration will be skipped!\n" "$backup_location/snapshot" | tee $PIPE
-        printf "Move or delete destination directory and try backup again.\n" | tee $PIPE
+        printf "WARNING: Backup directory '%s' already exists. This configuration will be skipped!\n" "$backup_location/snapshot"
+        printf "Move or delete destination directory and try backup again.\n"
     fi
 
     NEW_NUM_ARRAY[$i]="$new_num"
@@ -423,7 +417,7 @@ for x in $selected_configs; do
 done
 
 # Actual backing up
-printf "\nPerforming backups...\n" | tee $PIPE
+printf "\nPerforming backups...\n"
 i=-1
 for x in $selected_configs; do
 
@@ -457,14 +451,14 @@ for x in $selected_configs; do
     backup_location="${BACKUPLOC_ARRAY[$i]}"
 
     if ($ssh test -d "$backup_location/snapshot") ; then
-        printf "ERROR: Backup directory '%s' already exists. Skipping backup of this configuration!\n" "$backup_location/snapshot" | tee $PIPE
+        printf "ERROR: Backup directory '%s' already exists. Skipping backup of this configuration!\n" "$backup_location/snapshot"
         continue
     fi
 
     $ssh mkdir -p $backup_location
 
     if [[ -z "$old_num" ]]; then
-        printf "Sending first snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
+        printf "Sending first snapshot for '%s' configuration...\n" "$x"  
         if [[ $doprogress -eq 0 ]]; then
             btrfs send "$new_snap" | pv | $ssh btrfs receive "$backup_location" &>/dev/null
         else
@@ -472,7 +466,7 @@ for x in $selected_configs; do
         fi
     else
 
-        printf "Sending incremental snapshot for '%s' configuration...\n" "$x" | tee $PIPE  
+        printf "Sending incremental snapshot for '%s' configuration...\n" "$x"  
         # Sends the difference between the new snapshot and old snapshot to the
         # backup location. Using the -c flag instead of -p tells it that there
         # is an identical subvolume to the old snapshot at the receiving
@@ -485,10 +479,10 @@ for x in $selected_configs; do
         fi
 
         if [[ $keep == "yes" ]]; then
-            printf "Modifying data for old local snapshot for '%s' configuration...\n" "$x" | tee $PIPE
+            printf "Modifying data for old local snapshot for '%s' configuration...\n" "$x"
             snapper -v -c "$x" modify -d "old snap-sync snapshot (you may remove)" -u "backupdir=,subvolid=,uuid=" -c "number" "$old_num"
         else
-            printf "Deleting old snapshot for %s...\n" "$x" | tee $PIPE
+            printf "Deleting old snapshot for %s...\n" "$x"
             snapper -c "$x" delete "$old_num"
         fi
 
@@ -510,14 +504,14 @@ for x in $selected_configs; do
     userdata="backupdir=$mybackupdir, subvolid=$selected_subvolid, uuid=$selected_uuid"
 
     # Tag new snapshot as the latest
-    printf "Tagging local snapshot as latest backup for '%s' configuration...\n" "$x" | tee $PIPE
+    printf "Tagging local snapshot as latest backup for '%s' configuration...\n" "$x"
     snapper -v -c "$x" modify -d "$description" -u "$userdata" "$new_num"
 
-    printf "Backup complete for '%s' configuration.\n" "$x" > $PIPE
+    printf "Backup complete for '%s' configuration.\n" "$x"
 
 done
 
-printf "\nDone!\n" | tee $PIPE
+printf "\nDone!\n"
 exec 3>&-
 
 if [[ "$uuid_cmdline" != "none" ]]; then
