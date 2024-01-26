@@ -96,6 +96,7 @@ Options:
  -q, --quiet              do not send notifications; instead print them.
  -r, --remote <address>   ip address of a remote machine to backup to
  --sudo                   use sudo on the remote machine
+ --sudo-cmd <cmd>         command to use for sudo on the remote machine (default: sudo)
  -s, --subvolid <subvlid> subvolume id of the mounted BTRFS subvolume to back up to
  -u, --UUID <UUID>        UUID of the mounted BTRFS subvolume to back up to
 
@@ -105,6 +106,7 @@ EOF
 
 ssh=""
 sudo=0
+sudo_cmd="sudo"
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
@@ -140,17 +142,21 @@ while [[ $# -gt 0 ]]; do
             donotify=1
             shift
         ;;
-	    -r|--remote)
+        -r|--remote)
             remote=$2
             shift 2
-	    ;;
-	    -p|--port)
+        ;;
+        -p|--port)
             port=$2
             shift 2
-	    ;;
+        ;;
         --sudo)
             sudo=1
             shift
+        ;;
+        --sudo-cmd)
+            sudo_cmd="$2"
+            shift 2
         ;;
         *)
             die "Unknown option: '$key'. Run '$name -h' for valid options."
@@ -160,8 +166,8 @@ done
 
 notify() {
     for u in $(users | tr ' ' '\n' | sort -u); do
-        sudo -u $u DISPLAY=:0 \
-        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(sudo -u $u id -u)/bus \
+        "$sudo_cmd" -u "$u" DISPLAY=:0 \
+        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/"$($sudo_cmd -u "$u" id -u)"/bus \
         notify-send -a $name "$1" "$2" --icon="dialog-$3"
     done
 }
@@ -210,7 +216,7 @@ if [[ -n $remote ]]; then
         ssh="$ssh -p $port"
     fi
     if [[ $sudo -eq 1 ]]; then
-        ssh="$ssh sudo"
+        ssh="$ssh $sudo_cmd"
     fi
 fi
 
