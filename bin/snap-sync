@@ -366,7 +366,7 @@ for x in $selected_configs; do
         BACKUPDIR="$selected_mnt/$mybackupdir"
         $ssh test -d "$BACKUPDIR" || $ssh btrfs subvolume create "$BACKUPDIR"
     else
-        mybackupdir=$(snapper -c "$x" list -t single | awk -F"|" '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
+        mybackupdir=$(snapper -c "$x" list -t single | sed 's/│/|/g' | awk -F"|" '/'"subvolid=$selected_subvolid, uuid=$selected_uuid"'/ {print $5}' | awk -F "," '/backupdir/ {print $1}' | awk -F"=" '{print $2}')
         BACKUPDIR="$selected_mnt/$mybackupdir"
         $ssh test -d $BACKUPDIR || die "%s is not a directory on %s.\n" "$BACKUPDIR" "$selected_uuid"
     fi
